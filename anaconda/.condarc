@@ -1,0 +1,8 @@
+create_default_packages:
+  - matplotlib
+  - numpy
+  - pandas
+  - scikit-learn
+channels:
+  - conda-forge
+  - defaults
