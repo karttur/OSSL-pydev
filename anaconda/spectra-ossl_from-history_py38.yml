@@ -1,4 +1,4 @@
-name: spectraossl_py38
+name: ossl_py38
 channels:
   - defaults
 dependencies:
@@ -7,6 +7,4 @@ dependencies:
   - numpy
   - python=3.8
   - matplotlib
-  - psycopg2
-  - requests
-prefix: /Applications/anaconda3/envs/spectraossl_py38
+prefix: /Applications/anaconda3/envs/ossl_py38

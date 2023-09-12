@@ -53,6 +53,13 @@ The python package in this repo is called _ossl-xspectre_ and contains 4 python 
 - OSSL-mlmodel.py
 - xSpectre_Import.py
 
+The modules are setup for a virtual python environment with the first line of each module pointing towards this environment:
+
+```
+#!/Applications/anaconda3/envs/spectraimagine_py38/bin/python3.8
+```
+This need to be edited to reflect your python setup.
+
 Additionally the folder with the package contains two extra files:
 - .project
 - .pydevproject
@@ -63,7 +70,7 @@ How to install and setup Eclipse and then import and run ossl-xspectre is covere
 
 ## Running the ossl-xpsectre modules
 
-The modules of ossl-xspectre all require a specification of the local paths and names of 1) the OSSL data and 2) the command files that define how to processing:
+The modules of ossl-xspectre all require a specification of the local paths and names of 1) the OSSL data and 2) the command files that define how to do the processing:
 
 - **rootpath**: full path to folder with a downloaded OSSL zip file; parent folder to  "sourcedatafolder", "arrangeddatafolder", and "jsonfolder"
 - **sourcedatafolder**: subfolder under "rootpath" with the exploded content of the OSSL zip file (default = "data")
