@@ -58,7 +58,7 @@ The modules are setup for a virtual python environment with the first line of ea
 ```
 #!/Applications/anaconda3/envs/spectraimagine_py38/bin/python3.8
 ```
-This need to be edited to reflect your python setup.
+This need to be edited to reflect the local python setup on your machine.
 
 Additionally the folder with the package contains two extra files:
 - .project
@@ -91,3 +91,7 @@ The modules of ossl-xspectre all require a specification of the local paths and 
 ```
 
 The details for how to download, import, plot and model spectral data, with focus on OSSL, using the ossl-xspectre package is covered in the blog [xSpectre soil spectral libraries](https://karttur.github.io/soil-spectro/).
+
+## Example dataset
+
+The [GitHub repo OSSL-dataset](https://github.com/karttur/OSSL-data) contains example data from OSSL over Sweden. The repo also contains a short manual for how to try out the python package _ossl-xspectre_ in this repo using the Swedish OSSL.
