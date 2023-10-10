@@ -1,49 +1,74 @@
 #!/Applications/anaconda3/envs/spectraimagine_py38/bin/python3.8
 '''
-Created on 3 Aug 2023
+Created on 8 Sep 2022
 
-Last edited 17 Spet 2023
+Edited on 27 Sep 2022
+
+Edited 22 Feb 2023
+
+Edited 7 August 2023
+
+Edited 30 August 2023
+
+Last edited 10 October 2023
 
 @author: thomasgumbricht
 
 Notes
 -----
-The module plot.py:
+The module OSSL_import.py:
 
-    requires that you have soil spectra data organised as json files in xSpectre format.
+    requires that you have downloaded and exploded a standard zip-archive from OSSL
+    (see https://karttur.github.io/soil-spectro/libspectrodata/spectrodata-OSSL-api-explorer/).
+    Create a folder for the zip file and rename it to reflect the geographic and/or thematic content.
+    When unzipping the zip file the content will be exploded into a subfolder called "data".
+    The subolder "data" should contain 5 csv files  (in alphabetic order):
 
-    The script takes 3 string parameters as input:
+        - mir.data.csv
+        - neon.data.csv
+        - soillab.data.csv
+        - soilsite.data.csv
+        - visnir.data.csv
 
-        - docpath: the full path to a folder that must contain the txt file as given by the "projFN" parameter
+    The script takes a single input parameter - the path (string)
+    to a json file with the following structure:
+
+        {
+          "rootpath": full/path/to/folder/where/you/saved/OSSL.zip,
+          "sourcedatafolder": "data",
+          "arrangeddatafolder": "arranged-data",
+          "jsonfolder": "json-import",
+          "projFN": "extract_rawdata.txt",
+          "createjsonparams": false
+        }
+
+        - rootpath: full path to folder with a downloaded OSSL zip file; parent folder to the exploded OSSL subfolder ("data")
+        - sourcedatafolder: subfolder under "rootpath" with the exploded content of the OSSL zip file (default = "data")
+        - arrangeddatafolder: subfolder under "rootpath" where the imported (rearranged) OSSL data will be stored
         - projFN: the name of an existing txt files that sequentially lists json parameter files to run
-        - jsonpath: the relative path (vis-a-vis "docpath") where the json parameter files (listed in "projFN") are
+        - jsonfolder: the relative path (vis-a-vis "rootpath") where the json parameter files (listed in "projFN") are located
+        - createjsonparams: if set to true the script will create a template json file and exit
 
     The parameter files must list approximately 40 parameters in a precise nested json structure with dictionaries and lists.
     You can create a template json parameter file by running "def CreateParamJson" (just uncomment under "def SetupProcesses",
-    this creates a template json parameter file called "extract_soillines.json" in the path given as the parameter "docpath".
+    this creates a template json parameter file called "import_ossl-spectra.json" in the path given as the parameter "rootpath".
 
-    With an edited json parameter file the script reads the spectral data in xSpectre´s json format.
-    The script first run the stand alone "def SetupProcesses" that reads the txt file "projFN" and
-    then sequentialy run the json parameter files listed.
+    With an edited json parameter file pointing at the downloaded and exploded folder (parameter: rootFP), the script reads the
+    files and imports the data as requested in the json parameter file. The script first run the stand alone "def SetupProcesses"
+    that reads the txt file "projFN" and then sequentially run the json parameter files listed.
 
-    Each soilline extraction (i.e. each json parameter file) is run as a separate instance of the class "SoilLine".
+    Each import process results in 2 files for each wavelength band (mir/neon/visnir) that are
+    set for import in the json command file.
 
-    Each soilline extract process result in 2 json files, containg 1) the extacted soillines and 2) soil
-    spectral endmembers for darksoil and lightsoil. The names of the destination files cannot be set by the
-    user, they are defaulted as follows:
+    The names of the destination files cannot be set by the user, they are defaulted as follows,
 
-    soillines result files:
+        parameters: "rootFP"/"wavelength bands"/params-"wavelength-bands"_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"
+                "rootFP"/arranged-data/visnir/"project_name"_"first wavelength"-"last wavelength"_"band width"/
+                data-visnir_"LastPartoOfrootFP"_"first wavelength"-"last wavelength"_"band width".json
 
-        "rootFP"#visnirjson#visnir_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"_result-soillines.json
-
-    endmember result files:
-
-        "rootFP"#visnirjson#visnir_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"_result-endmembers.json
-
-    If requested the script also produced png images showing the raw and/or final soillines:
-
-        "rootFP"#visnirjson#visnir_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"_raw-soillines.png
-        "rootFP"#visnirjson#visnir_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"_final-soillines.png
+        data: "rootFP"/"wavelength bands"/data-"wavelength-bands"_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"
+                "rootFP"/arranged-data/visnir/"project_name"_"first wavelength"-"last wavelength"_"band width"/
+                data-visnir_"LastPartoOfrootFP"_"first wavelength"-"last wavelength"_"band width".json
 
 '''
 
@@ -58,59 +83,13 @@ import datetime
 
 from copy import deepcopy
 
-# import pprint
+import pprint
 
 import csv
 
 # Third party imports
-import tempfile
-
 import numpy as np
 
-import pandas as pd
-
-import matplotlib.pyplot as plt
-
-from scipy.stats import randint as sp_randint
-
-import pickle
-
-from sklearn.preprocessing import StandardScaler
-
-from sklearn.cluster import FeatureAgglomeration
-from sklearn.linear_model import BayesianRidge
-from sklearn.pipeline import Pipeline, make_pipeline
-from joblib import Memory
-
-from sklearn.model_selection import KFold
-from sklearn import model_selection
-from sklearn import linear_model
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.svm import SVR
-from sklearn.neural_network import MLPRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import GridSearchCV
-
-# Outlier detection
-from sklearn.ensemble import IsolationForest
-from sklearn.covariance import EllipticEnvelope
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.svm import OneClassSVM
-
-# Feature selection
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import f_regression
-from sklearn.feature_selection import RFE, RFECV
-from sklearn.feature_selection import SelectFromModel
-
-from sklearn.inspection import permutation_importance
-
-#from cubist import Cubist
 
 def Today():
 
@@ -130,6 +109,12 @@ def ReadCSV(FPN):
     '''
 
     rowL = []
+    
+    if not os.path.exists(FPN):
+        
+        exitStr = 'File does not exist: %s' %(FPN)
+        
+        exit(exitStr )
 
     with open( FPN, 'r' ) as csvF:
 
@@ -214,10 +199,12 @@ def StandardParams():
 
     paramD['importVersion'] = "OSSL-202308"
 
+    paramD['rootFP'] = '/path/to/folder/with/ossl/download'
+
     return paramD
 
 def StandardXspectreParams():
-    """ Default standard parameters for all OSSL processing
+    """ Default standard parameters for importing xSpectre spectral data
 
         :returns: parameter dictionary
 
@@ -238,27 +225,92 @@ def StandardXspectreParams():
 
     return paramD
 
-def MLmodelParams():
-    ''' Default parameters for soilline extraction from soil spectral library data
+def ImportParams():
+    """ Default template parameters for importing OSSL csv data
 
         :returns: parameter dictionary
+
         :rtype: dict
-    '''
+    """
 
     paramD = StandardParams()
 
     paramD['campaign'] = CampaignParams()
 
-    paramD['input'] = {}
 
-    paramD['input']['jsonSpectraDataFilePath'] = 'path/to/jsonfile/with/spectraldata.json'
 
-    paramD['input']['jsonSpectraParamsFilePath'] = 'path/to/jsonfile/with/spectralparams.json'
+    '''
 
-    paramD['input']['hyperParameterRandomTuning'] = 'path/to/jsonfile/with/hyperparam/tuning.json'
+    paramD['soilSample'] = {'minDepth':0,'maxDepth':20}
 
-    ''' LUCAS oriented targetFeatures data'''
-    paramD['targetFeatures'] = ['caco3_usda.a54_w.pct',
+    paramD['visnir'] = {}
+
+    paramD['visnir']['apply'] = True
+
+    paramD['visnir']['subFP'] = 'visnir'
+
+    paramD['visnir']['beginWaveLength'] = 460
+
+    paramD['visnir']['endWaveLength'] = 1050
+
+    paramD['visnir']['inputBandWidth'] = 2
+
+    paramD['visnir']['outputBandWidth'] = 10
+
+    paramD['mir'] = {}
+
+    paramD['mir']['apply'] = True
+
+    paramD['mir']['subFP'] = 'mir'
+
+    paramD['mir']['beginWaveLength'] = 2500
+
+    paramD['mir']['endWaveLength'] = 8000
+
+    paramD['mir']['inputBandWidth'] = 2
+
+    paramD['mir']['outputBandWidth'] = 10
+
+    paramD['neon'] = {}
+
+    paramD['neon']['apply'] = True
+
+    paramD['neon']['subFP'] = 'neon'
+
+    paramD['neon']['beginWaveLength'] = 1350
+
+    paramD['neon']['endWaveLength'] = 2550
+
+    paramD['neon']['inputBandWidth'] = 2
+
+    paramD['neon']['outputBandWidth'] = 10
+    '''
+
+    paramD['soilSample'] = {'maxDepth': 20, 'minDepth': 0}
+
+    paramD['visnir'] = { 'apply': True,
+              'beginWaveLength': 460,
+              'endWaveLength': 1050,
+              'inputBandWidth': 2,
+              'outputBandWidth': 10,
+              'subFP': 'visnir'}
+
+    paramD['neon'] = { 'apply': False,
+            'beginWaveLength': 1350,
+            'endWaveLength': 2550,
+            'inputBandWidth': 2,
+            'outputBandWidth': 10,
+            'subFP': 'neon'}
+
+    paramD['mir'] = { 'apply': False,
+           'beginWaveLength': 2500,
+           'endWaveLength': 8000,
+           'inputBandWidth': 2,
+           'outputBandWidth': 10,
+           'subFP': 'mir'}
+
+    ''' LUCAS oriented input data'''
+    paramD['labData'] = ['caco3_usda.a54_w.pct',
       'cec_usda.a723_cmolc.kg',
       'cf_usda.c236_w.pct',
       'clay.tot_usda.a334_w.pct',
@@ -272,331 +324,105 @@ def MLmodelParams():
       'sand.tot_usda.c60_w.pct',
       'silt.tot_usda.c62_w.pct']
 
-    paramD['targetFeatureSymbols'] = {'caco3_usda.a54_w.pct':{'color': 'orange', 'size':50}}
+    ''' LabDataRange - example'''
 
-    paramD['derivatives'] = {'apply':False, 'join':False}
+    paramD['labDataRange'] =  {'caco3_usda.a54_w.pct': {'max': 10, 'min': 0}}
 
-    paramD['removeOutliers'] = {}
+    #paramD['labDataRange'] = {}
 
-    paramD['removeOutliers']['comment'] = "removes sample outliers based on spectra only - globally applied as preprocess"
-
-    paramD['removeOutliers']['apply'] = True
-
-    paramD['removeOutliers']['detectorMethodList'] = ["iforest (isolationforest)",
-                                                      "ee (eenvelope,ellipticenvelope)",
-                                                      "lof (lofactor,localoutlierfactor)",
-                                                      "1csvm (1c-svm, oneclasssvm)"]
-
-    paramD['removeOutliers']['detector'] = "1csvm"
-
-    paramD['removeOutliers']['contamination'] = 0.1
-
-    paramD['manualFeatureSelection'] = {}
-
-    paramD['manualFeatureSelection']['comment'] = "Manual feature selection overrides other selection alternatives"
-
-    paramD['manualFeatureSelection'] ['apply'] = False
-
-    paramD['manualFeatureSelection']['spectra'] = [ "A", "B", "C"],
-
-    paramD['manualFeatureSelection']['derivatives'] = {}
-
-    paramD['manualFeatureSelection']['derivatives']['firstWaveLength'] = ['A','D']
-
-    paramD['manualFeatureSelection']['derivatives']['lastWaveLength'] = ['C','F']
-
-    paramD['globalFeatureSelection'] = {}
-
-    paramD['globalFeatureSelection']['comment'] ="removes spectra with variance below given thresholds - globally applied as preprocess",
-
-    paramD['globalFeatureSelection']['apply'] = False
-
-    paramD['globalFeatureSelection']['varianceThreshold'] = {'threshold': 0.025}
-
-
-    paramD['modelFeatureSelection'] = {}
-
-    paramD['modelFeatureSelection']['comment'] = 'feature selection using model data',
-
-    paramD['modelFeatureSelection']['apply'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection'] = {}
-
-    paramD['modelFeatureSelection']['univariateSelection']['apply'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectKBest'] = {}
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectKBest']['apply'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectKBest']['n_features'] = 5
-
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectPercentile'] = {}
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectPercentile']['implemented'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectPercentile']['apply'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['SelectPercentile']['percentile'] = 10
-
-
-    paramD['modelFeatureSelection']['univariateSelection']['genericUnivariateSelect'] = {}
-
-    paramD['modelFeatureSelection']['univariateSelection']['genericUnivariateSelect']['implemented'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['genericUnivariateSelect']['apply'] = False
-
-    paramD['modelFeatureSelection']['univariateSelection']['genericUnivariateSelect']['hyperParameters'] = {}
-
-
-    paramD['modelFeatureSelection']['RFE'] = {}
-
-    paramD['modelFeatureSelection']['RFE']['apply'] = True
-
-    paramD['modelFeatureSelection']['RFE']['CV'] = True
-
-    paramD['modelFeatureSelection']['RFE']['n_features_to_select'] = 5
-
-    paramD['modelFeatureSelection']['RFE']['step'] = 1
-
-
-    paramD['featureAgglomeration'] = {}
-
-    paramD['featureAgglomeration']['apply'] = False
-
-    paramD['featureAgglomeration']['agglomerativeClustering'] = {}
-
-    paramD['featureAgglomeration']['agglomerativeClustering']['apply'] = False
-
-    paramD['featureAgglomeration']['agglomerativeClustering']['implemented'] = False
-
-    paramD['featureAgglomeration']['wardClustering'] = {}
-
-    paramD['featureAgglomeration']['wardClustering']['apply'] = False
-
-    paramD['featureAgglomeration']['wardClustering']['n_cluster'] = 0
-
-    paramD['featureAgglomeration']['wardClustering']['affinity'] = 'euclidean'
-
-    paramD['featureAgglomeration']['wardClustering']['tuneWardClustering'] = {}
-
-    paramD['featureAgglomeration']['wardClustering']['tuneWardClustering']['apply'] = False
-
-    paramD['featureAgglomeration']['wardClustering']['tuneWardClustering']['kfolds'] = 3
-
-    paramD['featureAgglomeration']['wardClustering']['tuneWardClustering']['clusters'] = [2,
-            3,4,5,6,7,8,9,10,11,12]
-
-    paramD['hyperParameterTuning'] = {}
-
-    paramD['hyperParameterTuning']['apply'] = False
-
-    paramD['hyperParameterTuning']['fraction'] = 0.5
-
-    paramD['hyperParameterTuning']['nIterSearch'] = 6
-
-    paramD['hyperParameterTuning']['n_top'] = 3
-
-    paramD['hyperParameterTuning']['randomTuning'] = {}
-
-    paramD['hyperParameterTuning']['randomTuning']['apply'] = False
-
-    paramD['hyperParameterTuning']['exhaustiveTuning'] = {}
-
-    paramD['hyperParameterTuning']['exhaustiveTuning']['apply'] = False
-
-    paramD['featureImportance'] = {}
-
-    paramD['featureImportance']['apply'] = True
-
-    paramD['featureImportance']['reportMaxFeatures'] = 12
-
-    paramD['featureImportance']['permutationRepeats'] = 10
-
-    paramD['modelling'] = {}
-
-    paramD['modelling']['apply'] = True
-
-    paramD['regressionModels'] = {}
-
-    paramD['regressionModels']['OLS'] = {}
-
-    paramD['regressionModels']['OLS']['apply'] = False
-
-    paramD['regressionModels']['OLS']['hyperParams'] = {}
-
-    paramD['regressionModels']['OLS']['hyperParams']['fit_intercept'] = False
-
-    paramD['regressionModels']['TheilSen'] = {}
-
-    paramD['regressionModels']['TheilSen']['apply'] = False
-
-    paramD['regressionModels']['TheilSen']['hyperParams'] = {}
-
-    paramD['regressionModels']['Huber'] = {}
-
-    paramD['regressionModels']['Huber']['apply'] = False
-
-    paramD['regressionModels']['Huber']['hyperParams'] = {}
-
-    paramD['regressionModels']['KnnRegr'] = {}
-
-    paramD['regressionModels']['KnnRegr']['apply'] = False
-
-    paramD['regressionModels']['KnnRegr']['hyperParams'] = {}
-
-    paramD['regressionModels']['DecTreeRegr'] = {}
-
-    paramD['regressionModels']['DecTreeRegr']['apply'] = False
-
-    paramD['regressionModels']['DecTreeRegr']['hyperParams'] = {}
-
-    paramD['regressionModels']['SVR'] = {}
-
-    paramD['regressionModels']['SVR']['apply'] = False
-
-    paramD['regressionModels']['SVR']['hyperParams'] = {}
-
-    paramD['regressionModels']['SVR']['hyperParams']['kernel'] = 'linear'
-
-    paramD['regressionModels']['SVR']['hyperParams']['C'] = 1.5
-
-    paramD['regressionModels']['SVR']['hyperParams']['epsilon'] = 0.05
-
-    paramD['regressionModels']['RandForRegr'] = {}
-
-    paramD['regressionModels']['RandForRegr']['apply'] = False
-
-    paramD['regressionModels']['RandForRegr']['hyperParams'] = {}
-
-    paramD['regressionModels']['RandForRegr']['hyperParams']['n_estimators'] = 30
-
-
-    paramD['regressionModels']['MLP'] = {}
-
-    paramD['regressionModels']['MLP']['apply'] = False
-
-    paramD['regressionModels']['MLP']['hyperParams'] = {}
-
-    paramD['regressionModels']['MLP']['hyperParams']['hidden_layer_sizes'] = [100,100]
-
-    paramD['regressionModels']['MLP']['hyperParams']['max_iter'] = 200
-
-    paramD['regressionModels']['MLP']['hyperParams']['tol'] = 0.001
-
-    paramD['regressionModels']['MLP']['hyperParams']['epsilon'] = 1e-8
-
-    paramD['modelTests'] = {}
-
-    paramD['modelTests']['trainTest'] = {}
-
-    paramD['modelTests']['trainTest']['apply'] = False
-
-    paramD['modelTests']['trainTest']['testSize'] = 0.3
-
-    paramD['modelTests']['trainTest']['plot'] = True
-
-    paramD['modelTests']['trainTest']['marker'] = 's'
-
-
-    paramD['modelTests']['Kfold'] = {}
-
-    paramD['modelTests']['Kfold']['apply'] = False
-
-    paramD['modelTests']['Kfold']['folds'] = 10
-
-    paramD['modelTests']['Kfold']['plot'] = True
-
-    paramD['modelTests']['Kfold']['marker'] = '.'
-
-
-    paramD['plot'] = {}
-
-    paramD['plot']['apply'] = True
-
-    paramD['plot']['subPlots'] = {}
-
-    paramD['plot']['subPlots']['singles'] = {}
-
-    paramD['plot']['subPlots']['singles']['apply'] = True
-
-    paramD['plot']['subPlots']['singles']['regressor'] = False
-
-    paramD['plot']['subPlots']['singles']['targetFeature'] = False
-
-    paramD['plot']['subPlots']['singles']['hyperParameters'] = False
-
-    paramD['plot']['subPlots']['singles']['modelTests'] = False
-
-    paramD['plot']['subPlots']['rows'] = {}
-
-    paramD['plot']['subPlots']['rows']['apply'] = True
-
-    paramD['plot']['subPlots']['rows']['regressor'] = False
-
-    paramD['plot']['subPlots']['rows']['targetFeature'] = False
-
-    paramD['plot']['subPlots']['rows']['hyperParameters'] = False
-
-    paramD['plot']['subPlots']['rows']['modelTests'] = False
-
-    paramD['plot']['subPlots']['columns'] = {}
-
-    paramD['plot']['subPlots']['columns']['apply'] = True
-
-    paramD['plot']['subPlots']['columns']['regressor'] = False
-
-    paramD['plot']['subPlots']['columns']['targetFeature'] = False
-
-    paramD['plot']['subPlots']['columns']['hyperParameters'] = False
-
-    paramD['plot']['subPlots']['columns']['modelTests'] = False
-
-    paramD['plot']['subPlots']['doubles'] = {}
-
-    paramD['plot']['subPlots']['doubles']['apply'] = True
-
-    paramD['plot']['subPlots']['doubles']['columns'] = "regressor, targetFeature, hyperParameters or modelTest"
-
-    paramD['plot']['subPlots']['doubles']['rows'] = "regressor, targetFeature, hyperParameters or modelTest"
-
-
-
-
-    paramD['plot']['figSize'] = {'x':0,'y':0}
-
-    paramD['plot']['legend'] = False
-
-    paramD['plot']['tightLayout'] = False
-
-    paramD['plot']['scatter'] = {'size':50}
-
-
-
-    paramD['plot']['text'] = {'x':0.6,'y':0.2}
-
-    paramD['plot']['text']['bandWidth'] = True
-
-    paramD['plot']['text']['samples'] = True
-
-    paramD['plot']['text']['text'] = ''
-
-    paramD['figure'] = {}
-
-    paramD['figure']['apply'] = True
-
+    #paramD['labDataRange']['caco3_usda.a54_w.pct'] = {
+    #    "min": 0,
+    #    "max": 10}
 
     return (paramD)
 
-def CreateArrangeParamJson(jsonFPN, projFN, processstep):
+def ImportXspectreParams():
+    """ Default template parameters for importing OSSL csv data
+
+        :returns: parameter dictionary
+
+        :rtype: dict
+    """
+
+    paramD = StandardXspectreParams()
+
+    paramD['campaign'] = CampaignParams()
+
+    paramD['rootFP'] = '/path/to/folder/with/ossl/download'
+
+    paramD['whiteReference'] = 'whiteRef.csv'
+
+    paramD['whiteReferenceFactor'] = 1.0
+
+    paramD['soilSample'] = {'minDepth':0,'maxDepth':100}
+
+    paramD['xspectrolum'] = {}
+
+    paramD['xspectrolum']['apply'] = True
+
+    paramD['xspectrolum']['subFP'] = 'visnir'
+
+    paramD['xspectrolum']['beginWaveLength'] = 460
+
+    paramD['xspectrolum']['endWaveLength'] = 1050
+
+    paramD['xspectrolum']['outputBandWidth'] = 10
+
+    paramD['mode'] = 'default'
+
+    paramD['version'] = ''
+
+    paramD['prepcode'] = ''
+
+    paramD['scan'] = ''
+
+    paramD['getlist'] = ''
+
+    paramD['listPath'] = ''
+
+    paramD['pattern'] = ''
+
+
+    ''' LUCAS oriented input data
+    paramD['labData'] = ['caco3_usda.a54_w.pct',
+      'cec_usda.a723_cmolc.kg',
+      'cf_usda.c236_w.pct',
+      'clay.tot_usda.a334_w.pct',
+      'ec_usda.a364_ds.m',
+      'k.ext_usda.a725_cmolc.kg',
+      'n.tot_usda.a623_w.pct',
+      'oc_usda.c729_w.pct',
+      'p.ext_usda.a274_mg.kg',
+      'ph.cacl2_usda.a481_index',
+      'ph.h2o_usda.a268_index',
+      'sand.tot_usda.c60_w.pct',
+      'silt.tot_usda.c62_w.pct']
+    '''
+    ''' LabDataRange - example
+
+    paramD['labDataRange'] = {}
+
+    paramD['labDataRange']['caco3_usda.a54_w.pct'] = {
+        "min": 0,
+        "max": 10}
+    '''
+    return (paramD)
+
+def CreateArrangeParamJson(jsonFP, projFN, processstep):
     """ Create the default json parameters file structure, only to create template if lacking
 
-        :param str dstrootFP: directory path
+        :param str jsonFP: directory path
 
-        :param str jsonpath: subfolder under directory path
+        :param str jsonFP: file name
+
+        :param str processstep: the name of the processtep for which to create a template
     """
 
     def ExitMsgMsg(flag):
+        """ Exit message from CreateArrangeParamJson
+
+            :param str flag: True if template file already existed; false if template was created
+        """
 
         if flag:
 
@@ -610,17 +436,17 @@ def CreateArrangeParamJson(jsonFPN, projFN, processstep):
 
         exitstr += ' Add the path of the edited file to your project file (%s).\n' %(projFN)
 
-        exitstr += ' Then set createjsonparams to False in the main section and rerun script.'
+        exitstr += ' Then set createjsonparams to false and rerun script.'
 
         exit(exitstr)
 
-    if processstep.lower() in ['model','mlmodel']:
+    if processstep.lower() in ['import','arrange']:
 
         # Get the default import params
-        paramD = MLmodelParams()
+        paramD = ImportParams()
 
         # Set the json FPN
-        jsonFPN = os.path.join(jsonFPN, 'template_model_ossl-spectra.json')
+        jsonFPN = os.path.join(jsonFP, 'template_import_ossl-spectra.json')
 
     if processstep.lower() in ['importxspectre','arrangexspectre']:
 
@@ -644,12 +470,16 @@ def CreateArrangeParamJson(jsonFPN, projFN, processstep):
 
     ExitMsgMsg(False)
 
-def CheckMakeDocPaths(rootpath,arrangeddatafolder, jsonpath, sourcedatafolder=False):
-    """ Create the default json parameters file structure, only to create template if lacking
+def CheckMakeDocPaths(rootpath,arrangeddatafolder, jsonfolder, sourcedatafolder=False):
+    """ Create the folder and file structure
 
-        :param str dstrootFP: directory path
+        :param str rootpath: root directory path
 
-        :param str jsonpath: subfolder under directory path
+        :param str arrangeddatafolder: the destination subfolder under rootpath for all processed data
+
+        :param str jsonfolder: subfolder under arrangeddatafolder where the json command files are located
+
+        :param bool sourcedatafolder: if True a template json command will be creates, otherwise ignored
     """
 
     if not os.path.exists(rootpath):
@@ -674,7 +504,7 @@ def CheckMakeDocPaths(rootpath,arrangeddatafolder, jsonpath, sourcedatafolder=Fa
 
         os.makedirs(dstRootFP)
 
-    jsonFP = os.path.join(dstRootFP,jsonpath)
+    jsonFP = os.path.join(dstRootFP,jsonfolder)
 
     if not os.path.exists(jsonFP):
 
@@ -685,8 +515,7 @@ def CheckMakeDocPaths(rootpath,arrangeddatafolder, jsonpath, sourcedatafolder=Fa
 def ReadImportParamsJson(jsonFPN):
     """ Read the parameters for importing OSSL data
 
-    :param jsonFPN: path to json file
-    :type jsonFPN: str
+    :param str jsonFPN: path to json file
 
     :return paramD: parameters
     :rtype: dict
@@ -694,10 +523,18 @@ def ReadImportParamsJson(jsonFPN):
 
     return ReadAnyJson(jsonFPN)
 
-def ReadProjectFile(dstRootFP,projFN, jsonFP):
+def ReadProjectFile(rootFP, dstRootFP,projFN, jsonFP):
+    """ Read the project file (txt file)
+
+        :param str dstRootFP: destination root directory path
+
+        :param str projFN: project file name
+
+        :param str jsonFP: subfolder uder dstRootFP where projFN is stored
+    """
 
     projFPN = os.path.join(dstRootFP,projFN)
-
+    
     if not os.path.exists(projFPN):
 
         exitstr = 'EXITING, project file missing: %s.' %(projFPN)
@@ -712,7 +549,7 @@ def ReadProjectFile(dstRootFP,projFN, jsonFP):
     with open(projFPN) as f:
 
         jsonL = f.readlines()
-
+  
     # Clean the list of json objects from comments and whithespace etc
     jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonL if len(x) > 10 and x[0] != '#']
 
@@ -734,7 +571,7 @@ class Obj(object):
                 setattr(self, k, Obj(v) if isinstance(v, dict) else v)
 
     def _SetArrangeDefautls(self):
-        ''' Set class object default data if missing
+        ''' Set import default data
         '''
 
         if not hasattr(self, 'sitedata'):
@@ -755,16 +592,9 @@ class Obj(object):
             if not item in self.sitedata:
 
                 self.sitedata.append(item)
-        '''
-        self.visnirStep = int(self.input.visnirOutputBandWidth/ self.input.visnirInputBandWidth)
-
-        self.mirStep = int(self.input.mirOutputBandWidth/ self.input.mirInputBandWidth)
-
-        self.neonStep = int(self.input.neonOutputBandWidth/ self.input.neonInputBandWidth)
-        '''
 
     def _SetPlotDefaults(self):
-        ''' Set class object default data if required
+        ''' Set plot default data
         '''
 
         if self.plot.singles.figSize.x == 0:
@@ -800,7 +630,7 @@ class Obj(object):
         return (x,y)
 
     def _SetSoilLineDefautls(self):
-        ''' Set class object default data if required
+        ''' Set soil line default data
         '''
 
         if self.plot.singles.figSize.x == 0:
@@ -812,7 +642,7 @@ class Obj(object):
             self.plot.singles.figSize.y = 6
 
     def _SetModelDefaults(self):
-        ''' Set class object default data if required
+        ''' Set machine learning default data
         '''
 
         if self.plot.singles.figSize.x == 0:
@@ -836,2420 +666,709 @@ class Obj(object):
 
             self.featureAgglomeration.apply = False
 
-
-def ReadModelJson(jsonFPN):
-    """ Read the parameters for modeling
-
-    :param jsonFPN: path to json file
-    :type jsonFPN: str
-
-    :return paramD: parameters
-    :rtype: dict
-   """
-
-    with open(jsonFPN) as jsonF:
-
-        paramD = json.load(jsonF)
-
-    return (paramD)
-
-class RegressionModels:
-
-    '''Machinelearning using regression models
-    '''
-    def __init__(self):
-        '''creates an empty instance of RegressionMode
-        '''
-
-        self.modelSelectD = {}
-
-        self.modelRetaindD = {}
-
-        self.modD = {}
-
-        #Create a list to hold retained columns
-        self.retainD = {}
-
-        self.retainPrintD = {}
-
-        self.tunedModD = {}
-
-    def _ExtractDataFrame(self):
-        ''' Extract the original dataframe to X (covariate) array and y (predict) column
-        '''
-
-        # Extract the target feature
-        self.y = self.abundanceDf[self.targetFeature]
-
-        # Append the target array to the self.spectraDF dataframe
-        self.spectraDF['target'] = self.y
-
-        # define the list of covariates to use
-        #self.columnsX = [item for item in self.spectraDF.columns if item not in self.omitL]
-        self.columnsX = [item for item in self.spectraDF.columns]
-
-        # extract the covariate columns as X
-        self.X = self.spectraDF[self.columnsX]
-
-        # Drop the added target column from the dataframe
-        self.spectraDF = self.spectraDF.drop('target', axis=1)
-
-        # Remove all samples where the targetfeature is NaN
-        self.X = self.X[~np.isnan(self.X).any(axis=1)]
-
-        # Drop the added target column from self.X
-        self.X = self.X.drop('target', axis=1)
-
-        # Then also delete NaN from self.y
-        self.y = self.y[~np.isnan(self.y)]
-
-    def _SetTargetFeatureSymbol(self):
-        '''
-        '''
-
-        self.featureSymbolColor = 'black'
-
-        self.featureSymbolMarker = '.'
-
-        self.featureSymbolSize = 100
-
-        if hasattr(self, 'targetFeatureSymbols'):
-
-            if hasattr(self.targetFeatureSymbols, self.targetFeature):
-
-                symbol = getattr(self.targetFeatureSymbols, self.targetFeature)
-
-                if hasattr(symbol, 'color'):
-
-                    self.featureSymbolColor = getattr(symbol, 'color')
-
-                if hasattr(symbol, 'size'):
-
-                    self.featureSymbolSize = getattr(symbol, 'size')
-
-    def _PlotRegr(self, obs, pred, suptitle, title, txtstr,  txtstrHyperParams, regrModel, modeltest):
-        '''
-        '''
-        if self.plot.singles.apply:
-
-            fig, ax = plt.subplots()
-            ax.scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                       s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
-                       marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
-            ax.plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
-            ax.set_xlabel('Observations')
-            ax.set_ylabel('Predictions')
-            plt.suptitle(suptitle)
-            plt.title(title)
-            plt.text(obs.min(), (obs.max()-obs.min())*0.8, txtstr,  wrap=True)
-
-            #plt.text(obs.max()-((obs.max()-obs.min())*0.3), (obs.min()+obs.max())*0.1, txtstrHyperParams,  wrap=True)
-
-            if self.plot.singles.screenShow:
-
-                plt.show()
-
-            if self.plot.singles.savePng:
-
-                fig.savefig(self.imageFPND[self.targetFeature][regrModel][modeltest])
-
-            plt.close(fig=fig)
-
-        if self.plot.rows.apply:
-
-            if self.plot.rows.targetFeatures.apply:
-
-                # modeltest is either trainTest of Kfold
-                if modeltest in self.plot.rows.targetFeatures.columns:
-
-                    if len(self.targetFeatures) == 1:
-
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                               s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
-                               marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
-
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest] ].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
-
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest]].text(.05, .95,
-                                                        txtstr, ha='left', va='top',
-                                                        transform=self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest]].transAxes)
-
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest]].yaxis.set_label_position("right")
-
-
-                    else:
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                               s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
-                               marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest] ].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest]].text(.05, .95,
-                                                        txtstr, ha='left', va='top',
-                                                        transform=self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest]].transAxes)
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest]].yaxis.set_label_position("right")
-
-                    # if at last column
-                    if self.targetFeaturePlotColumnD[modeltest] == len(self.plot.rows.regressionModels.columns)-1:
-
-                        if len(self.targetFeatures) == 1:
-
-                            self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest]].set_ylabel('Predictions')
-
-                        else:
-
-                            self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest]].set_ylabel('Predictions')
-
-                    # if at last row
-                    if self.targetN == self.nTargetFeatures-1:
-
-                        if len(self.targetFeatures) == 1:
-
-                            self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest]].set_xlabel('Observations')
-
-                        else:
-
-                            self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[modeltest]].set_xlabel('Observations')
-
-
-            if self.plot.rows.regressionModels.apply:
-
-                # modeltest is either trainTest of Kfold
-                if modeltest in self.plot.rows.regressionModels.columns:
-
-                    #self.columnAxs[self.regrModel][self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                    #       s=self.featureSymbolSize, marker=self.featureSymbolMarker)
-
-                    if (len(self.regressorModels)) == 1:
-
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                               s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
-                               marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
-
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
-
-
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].text(.05, .95, txtstr, ha='left', va='top',
-                                                        transform=self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].transAxes)
-
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].yaxis.set_label_position("right")
-
-                    else:
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                               s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
-                               marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
-
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].text(.05, .95, txtstr, ha='left', va='top',
-                                                        transform=self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].transAxes)
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].yaxis.set_label_position("right")
-
-
-                    # if at last column
-                    if self.regressionModelPlotColumnD[modeltest] == len(self.plot.rows.targetFeatures.columns)-1:
-
-                        if self.regrN == self.nRegrModels-1:
-
-                            if (len(self.regressorModels)) == 1:
-
-                                self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
-
-                            else:
-
-                                self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
-
-
-                        else:
-
-                            if (len(self.regressorModels)) == 1:
-
-                                self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
-
-                            else:
-
-                                self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
-
-
-                    # if at last row
-                    if self.regrN == self.nRegrModels-1:
-
-                        if (len(self.regressorModels)) == 1:
-
-                            self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
-
-                        else:
-
-                            self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
-
-                    else:
-
-                        if (len(self.regressorModels)) == 1:
-
-                            self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
-
-                        else:
-
-                            self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
-
-
-    def _RegModelSelectSet(self):
-        """ Set the regressors to evaluate
-        """
-
-        self.regressorModels = []
-
-        if hasattr(self.regressionModels, 'OLS') and self.regressionModels.OLS.apply:
-
-            self.regressorModels.append(('OLS', linear_model.LinearRegression(**self.jsonparamsD['regressionModels']['OLS']['hyperParams'])))
-
-            self.modelSelectD['OLS'] = []
-
-        if hasattr(self.regressionModels, 'TheilSen') and self.regressionModels.TheilSen.apply:
-
-            self.regressorModels.append(('TheilSen', linear_model.TheilSenRegressor(**self.jsonparamsD['regressionModels']['OLS']['hyperParams'])))
-
-            self.modelSelectD['TheilSen'] = []
-
-        if hasattr(self.regressionModels, 'Huber') and self.regressionModels.Huber.apply:
-
-            self.regressorModels.append(('Huber', linear_model.HuberRegressor(**self.jsonparamsD['regressionModels']['OLS']['hyperParams'])))
-
-            self.modelSelectD['Huber'] = []
-
-        if hasattr(self.regressionModels, 'KnnRegr') and self.regressionModels.KnnRegr.apply:
-            self.regressorModels.append(('KnnRegr', KNeighborsRegressor( **self.jsonparamsD['regressionModels']['KnnRegr']['hyperParams'])))
-            self.modelSelectD['KnnRegr'] = []
-
-        if hasattr(self.regressionModels, 'DecTreeRegr') and self.regressionModels.DecTreeRegr.apply:
-            self.regressorModels.append(('DecTreeRegr', DecisionTreeRegressor(**self.jsonparamsD['regressionModels']['DecTreeRegr']['hyperParams'])))
-            self.modelSelectD['DecTreeRegr'] = []
-
-        if hasattr(self.regressionModels, 'SVR') and self.regressionModels.SVR.apply:
-            self.regressorModels.append(('SVR', SVR(**self.jsonparamsD['regressionModels']['SVR']['hyperParams'])))
-            self.modelSelectD['SVR'] = []
-
-        if hasattr(self.regressionModels, 'RandForRegr') and self.regressionModels.RandForRegr.apply:
-            self.regressorModels.append(('RandForRegr', RandomForestRegressor( **self.jsonparamsD['regressionModels']['RandForRegr']['hyperParams'])))
-            self.modelSelectD['RandForRegr'] = []
-
-        if hasattr(self.regressionModels, 'MLP') and self.regressionModels.MLP.apply:
-
-            '''
-            # First make a pipeline with standardscaler + MLP
-            mlp = make_pipeline(
-                StandardScaler(),
-                MLPRegressor( **self.jsonparamsD['regressionModels']['MLP']['hyperParams'])
-            )
-            '''
-            mlp = Pipeline([('scl', StandardScaler()),
-                    ('clf', MLPRegressor( **self.jsonparamsD['regressionModels']['MLP']['hyperParams']) ) ])
-
-            # Then add the pipeline as MLP
-            self.regressorModels.append(('MLP', mlp))
-
-            self.modelSelectD['MLP'] = []
-        '''
-        if hasattr(self.regressionModels, 'Cubist') and self.regressionModels.Cubist.apply:
-            self.regressorModels.append(('Cubist', Cubist( **self.jsonparamsD['regressionModels']['Cubist']['hyperParams'])))
-            self.modelSelectD['Cubist'] = []
-        '''
-
-    def _RegrModTrainTest(self):
-        '''
-        '''
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        #Split the data into training and test subsets
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=self.modelTests.trainTest.testSize)
-
-        #Fit the model
-        model.fit(X_train, y_train)
-
-        #Predict the independent variable in the test subset
-        predict = model.predict(X_test)
-
-        self.trainTestResultD[self.targetFeature][name] = {'mse':mean_squared_error(y_test, predict),
-                                                           'r2': r2_score(y_test, predict),
-                                                           'hyperParameterSetting': self.jsonparamsD['regressionModels'][name]['hyperParams'],
-                                                           'pickle': self.trainTestPickleFPND[self.targetFeature][name]
-                                                           }
-
-        # Save the complete model with cPickle
-        pickle.dump(model, open(self.trainTestPickleFPND[self.targetFeature][name],  'wb'))
-
-        if self.verbose:
-
-            infoStr =  '                trainTest Model: %s\n' %(name)
-            infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['regressionModels'][name]['hyperParams'])
-            infoStr += '                    Mean squared error: %.2f\n' \
-            % self.trainTestResultD[self.targetFeature][name]['mse']
-            infoStr += '                    Variance (r2) score: %.2f\n' \
-            % self.trainTestResultD[self.targetFeature][name]['r2']
-
-            print (infoStr)
-
-        if self.modelTests.trainTest.plot:
-            txtstr = 'nspectra: %s\n' %(self.X.shape[0])
-            txtstr += 'nbands: %s\n' %(self.X.shape[1])
-            #txtstr += 'min wl: %s\n' %(self.bandL[0])
-            #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
-            #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
-            #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
-
-            #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
-            suptitle = '%s train/test model (testsize = %s)' %(self.targetFeature, self.modelTests.trainTest.testSize)
-            title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
-                      % {'mod':name,'rmse':mean_squared_error(y_test, predict),'r2': r2_score(y_test, predict)} )
-
-            txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\n nSamples: %(n)d' \
-                      % {'rmse':self.trainTestResultD[self.targetFeature][name]['mse'],
-                         'r2': self.trainTestResultD[self.targetFeature][name]['r2'],
-                         'n': self.X.shape[0]} )
-
-            self._PlotRegr(y_test, predict, suptitle, title, txtstr, '',name, 'trainTest')
-
-
-    def _RegrModKFold(self):
-        """
-        """
-
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        predict = model_selection.cross_val_predict(model, self.X, self.y, cv=self.modelTests.Kfold.folds)
-
-        mse = mean_squared_error(self.y, predict)
-
-        r2 = r2_score(self.y, predict)
-
-        self.KfoldResultD[self.targetFeature][name] = {'mse': mse,
-                                                           'r2': r2,
-                                                           'hyperParameterSetting': self.jsonparamsD['regressionModels'][name]['hyperParams'],
-                                                           'pickle': self.KfoldPickleFPND[self.targetFeature][name]
-                                                           }
-        # Save the complete model with cPickle
-        pickle.dump(model, open(self.KfoldPickleFPND[self.targetFeature][name],  'wb'))
-
-        if self.verbose:
-
-            infoStr =  '                Kfold Model: %s\n' %(name)
-            infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['regressionModels'][name]['hyperParams'])
-            infoStr += '                    Mean squared error: %.2f\n' \
-            % mse
-            infoStr += '                    Variance (r2) score: %.2f\n' \
-            % r2
-
-            print (infoStr)
-
-
-        txtstr = 'nspectra: %s\n' %(self.X.shape[0])
-        txtstr += 'nbands: %s\n' %(self.X.shape[1])
-        #txtstr += 'min wl: %s\n' %(self.bandL[0])
-        #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
-        #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
-        #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
-
-        #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
-        suptitle = '%s Kfold model (nfolds = %s)' %(self.targetFeature, self.modelTests.Kfold.folds)
-        title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
-                  % {'mod':name,'rmse':mse,'r2': r2} )
-
-        txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nSamples: %(n)d' \
-                      % {'rmse':self.KfoldResultD[self.targetFeature][name]['mse'],
-                         'r2': self.KfoldResultD[self.targetFeature][name]['r2'],
-                         'n': self.X.shape[0]} )
-
-        self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold')
-
-    def _PlotFeatureImportanceSingles(self, featureArray, importanceArray, errorArray, title, xyLabel, pngFPN):
-        '''
-        '''
-        # Convert to a pandas series
-        importanceDF = pd.Series(importanceArray, index=featureArray)
-
-        singlefig, ax = plt.subplots()
-
-        if isinstance(errorArray, np.ndarray):
-
-            importanceDF.plot.bar(yerr=errorArray, color=self.featureSymbolColor, ax=ax)
-
-        else:
-            importanceDF.plot.bar(yerr=errorArray, color=self.featureSymbolColor, ax=ax)
-
-        ax.set_title(title)
-
-        if xyLabel[0]:
-
-            ax.set_ylabel(xyLabel[0])
-
-        if xyLabel[1]:
-
-            ax.set_ylabel(xyLabel[1])
-
-        if self.plot.tightLayout:
-
-            singlefig.tight_layout()
-
-        if self.plot.singles.screenShow:
-
-            plt.show()
-
-        if self.plot.singles.savePng:
-
-            #fig.savefig(self.imageFPND[self.targetFeature][name]['featureImportance']['permutationImportance'])
-            singlefig.savefig(pngFPN)
-
-        plt.close(fig=singlefig)
-
-    def _PlotFeatureImportanceRows(self, featureArray, importanceArray, errorArray, importanceCategory, yLabel):
-        '''
-        '''
-
-        nnFS = self.X.shape
-
-        text = 'nFeatures: %s' %(nnFS[1])
-
-        if self.targetFeatureSelectionTxt != None:
-
-            text += '\n%s' %(self.targetFeatureSelectionTxt)
-
-        if self.agglomerateTxt != None:
-
-            text += '\n%s' %(self.agglomerateTxt)
-
-        if self.modelFeatureSelectionTxt != None:
-
-            text += '\n%s' %(self.modelFeatureSelectionTxt)
-
-        if self.plot.rows.targetFeatures.apply:
-
-            if importanceCategory in self.plot.rows.targetFeatures.columns:
-
-                if (len(self.targetFeatures)) == 1:
-
-                    self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory] ].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-                    self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory] ].tick_params(labelleft=False)
-
-                    self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory]].text(.3, .95, text, ha='left', va='top',
-                                                    transform=self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory]].transAxes)
-
-                    self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory]].set_ylabel(yLabel)
-
-                else:
-
-                    self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory] ].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-                    self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory] ].tick_params(labelleft=False)
-
-                    self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory]].text(.3, .95, text, ha='left', va='top',
-                                                    transform=self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory]].transAxes)
-
-                    self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory]].set_ylabel(yLabel)
-
-
-                if importanceCategory == 'featureImportance':
-
-                    if (len(self.targetFeatures)) == 1:
-
-                        # Draw horisontal line ay y=y
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory]].axhline(y=0, lw=1, c='black')
-
-                    else:
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory]].axhline(y=0, lw=1, c='black')
-                #x,y = SetTextPos(self.plot.text.x, self.plot.text.y, self.xylimD['xmin'], self.xylimD['xmax'], self.xylimD['ymin'], self.xylimD['ymax'])
-
-                #self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD['permutationImportance'] ].text(x, y, text)
-                #self.columnAxs[self.targetFeature][ self.plotColumnD['permutationImportance'] ].set_ylabel('Mean accuracy decrease')
-
-                # if at last row
-                if self.targetN == self.nTargetFeatures-1:
-
-                    if (len(self.targetFeatures)) == 1:
-
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[importanceCategory]].set_xlabel('Features')
-
-                    else:
-
-                        self.columnAxs[self.regrModel[0]][self.targetN, self.targetFeaturePlotColumnD[importanceCategory]].set_xlabel('Features')
-
-        if self.plot.rows.regressionModels.apply:
-
-            if importanceCategory in self.plot.rows.regressionModels.columns:
-
-                #self.columnAxs[self.regrModel][self.targetFeature][self.regrN, self.regressionModelPlotColumnD['permutationImportance'] ].bar(featureArray, permImportanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-
-                if (len(self.regressorModels)) == 1:
-
-                    self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory] ].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-                    self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory] ].tick_params(labelleft=False)
-
-                    self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory]].text(.3, .95, text, ha='left', va='top',
-                                                transform=self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory]].transAxes)
-
-                    self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory]].set_ylabel(yLabel)
-
-                else:
-
-                    self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory] ].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-                    self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory] ].tick_params(labelleft=False)
-
-                    self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].text(.3, .95, text, ha='left', va='top',
-                                                    transform=self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].transAxes)
-
-                    self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].set_ylabel(yLabel)
-
-                if importanceCategory == 'featureImportance':
-
-                    if (len(self.regressorModels)) == 1:
-
-                        # Draw horisontal line ay y=y
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory]].axhline(y=0, lw=1, c='black')
-
-                    else:
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].axhline(y=0, lw=1, c='black')
-
-                # if at last row
-                if self.regrN == self.nRegrModels-1:
-
-                    if (len(self.regressorModels)) == 1:
-
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[importanceCategory]].set_xlabel('Features')
-
-                    else:
-
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].set_xlabel('Features')
-
-    def _FeatureImportance(self):
-        '''
-        '''
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        #Split the data into training and test subsets
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=self.modelTests.trainTest.testSize)
-
-        #Fit the model
-        model.fit(X_train, y_train)
-
-        maxFeatures = min(self.featureImportance.reportMaxFeatures, len(self.columns))
-
-        # Permutation importance
-        n_repeats = self.featureImportance.permutationRepeats
-
-        permImportance = permutation_importance(model, X_test, y_test, n_repeats=n_repeats)
-
-        permImportanceMean = permImportance.importances_mean
-
-        permImportanceStd = permImportance.importances_std
-
-        sorted_idx = permImportanceMean.argsort()
-
-        permImportanceArray = permImportanceMean[sorted_idx][::-1][0:maxFeatures]
-
-        errorArray = permImportanceStd[sorted_idx][::-1][0:maxFeatures]
-
-        featureArray = np.asarray(self.columns)[sorted_idx][::-1][0:maxFeatures]
-
-        permImpD = {}
-
-        for i in range(len(featureArray)):
-
-            permImpD[featureArray[i]] = {'mean_accuracy_decrease': permImportanceArray[i],
-                                         'std': errorArray[i]}
-
-        self.modelFeatureImportanceD[self.targetFeature][name]['permutationsImportance'] = permImpD
-
-        if self.plot.singles.apply:
-
-            title = "Permutation importance\n Feature: %s; Model: %s" %(self.targetFeature, name)
-
-            xyLabel = ['Features', 'Mean accuracy decrease']
-
-            pngFPN = self.imageFPND[self.targetFeature][name]['featureImportance']['permutationImportance']
-
-            self._PlotFeatureImportanceSingles(featureArray, permImportanceArray, errorArray, title, xyLabel, pngFPN)
-
-        if self.plot.rows.apply:
-
-            self._PlotFeatureImportanceRows(featureArray, permImportanceArray, errorArray, 'permutationImportance', 'rel. Mean accur. decr.')
-
-        # Feature importance
-        if name in ['OLS','TheilSen','Huber', "Ridge", "ElasticNet", 'logistic', 'SVR']:
-
-            if name in ['logistic','SVR']:
-
-                importances = model.coef_[0]
-
-            else:
-
-                importances = model.coef_
-
-            absImportances = abs(importances)
-
-            sorted_idx = absImportances.argsort()
-
-            importanceArray = importances[sorted_idx][::-1][0:maxFeatures]
-
-            featureArray = np.asarray(self.columns)[sorted_idx][::-1][0:maxFeatures]
-
-            featImpD = {}
-
-            for i in range(len(featureArray)):
-
-                featImpD[featureArray[i]] = {'linearCoefficient': importanceArray[i]}
-
-            self.modelFeatureImportanceD[self.targetFeature][name]['featureImportance'] = featImpD
-
-            if self.plot.singles.apply:
-
-                title = "Linear feature coefficients\n Feature: %s; Model: %s" %(self.targetFeature, name)
-
-                xyLabels = ['Features','Coefficient']
-
-                pngFPN = self.imageFPND[self.targetFeature][name]['featureImportance']['regressionImportance']
-
-                self._PlotFeatureImportanceSingles(featureArray, importanceArray, None, title, xyLabels, pngFPN)
-
-            if self.plot.rows.apply:
-
-                self._PlotFeatureImportanceRows(featureArray, importanceArray, None, 'featureImportance','rel. coef. weight')
-
-        elif name in ['KnnRegr','MLP', 'Cubist']:
-            ''' These models do not have any feature importance to report
-            '''
-            pass
-
-        else:
-
-            featImpD = {}
-
-            importances = model.feature_importances_
-
-            sorted_idx = importances.argsort()
-
-            importanceArray = importances[sorted_idx][::-1][0:maxFeatures]
-
-            featureArray = np.asarray(self.columns)[sorted_idx][::-1][0:maxFeatures]
-
-            if name in ['RandForRegr']:
-
-                std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
-
-                errorArray = std[sorted_idx][::-1][0:maxFeatures]
-
-                for i in range(len(featureArray)):
-
-                    featImpD[featureArray[i]] = {'MDI': importanceArray[i],
-                                                 'std': errorArray[i]}
-
-            else:
-
-                errorArray = None
-
-                for i in range(len(featureArray)):
-
-                    featImpD[featureArray[i]] = {'MDI': importanceArray[i]}
-
-            self.modelFeatureImportanceD[self.targetFeature][name]['featureImportance'] = featImpD
-
-            if self.plot.singles.apply:
-
-                title = "MDI feature importance\n Feature: %s; Model: %s" %(self.targetFeature, name)
-
-                xyLabel = ['Features', 'Mean impurity decrease']
-
-                pngFPN = self.imageFPND[self.targetFeature][name]['featureImportance']['regressionImportance']
-
-
-                #pngFPN = self.imageFPND[self.targetFeature][name]['featureImportance']['permutationImportance']
-
-                self._PlotFeatureImportanceSingles(featureArray, importanceArray, errorArray, title, xyLabel, pngFPN)
-
-            if self.plot.rows.apply:
-
-                self._PlotFeatureImportanceRows(featureArray, importanceArray, errorArray, 'featureImportance', 'rel. mean impur. decr.')
-
-    def _ManualFeatureSelector(self):
-        '''
-        '''
-
-        # Reset self.columns
-        self.columns = self.manualFeatureSelection.spectra
-
-        # Create the dataframe for the sepctra
-        spectraDF = self.spectraDF[ self.columns  ]
-
-        self.manualFeatureSelectdRawBands =  self.columns
-        # Create any derivative covariates requested
-        for b in range(len(self.manualFeatureSelection.derivatives.firstWaveLength)):
-
-            bandL = [self.manualFeatureSelection.derivatives.firstWaveLength[b],
-                     self.manualFeatureSelection.derivatives.lastWaveLength[b]]
-
-        self.manualFeatureSelectdDerivates = bandL
-
-        derviationBandDF = self.spectraDF[ bandL  ]
-
-        bandFrame, bandColumn = self._SpectraDerivativeFromDf(derviationBandDF,bandL)
-
-        frames = [spectraDF,bandFrame]
-
-        spectraDF = pd.concat(frames, axis=1)
-
-        self.columns.extend(bandColumn)
-
-        # reset self.spectraDF
-        self.spectraDF = spectraDF
-
-    def _VarianceSelector(self):
-        '''
-        '''
-
-        threshold = self.globalFeatureSelection.varianceThreshold.threshold
-
-        #istr = 'Selected features:\nvarianceThreshold (%s)'% threshold
-
-        #self.selectstrL.append(istr)
-
-        # define the list of covariates to use
-        #self.columnsX = [item for item in self.spectraDF.columns if item not in self.omitL]
-
-        self.columnsX = [item for item in self.spectraDF.columns]
-
-        # extract the covariate columns as X
-        X = self.spectraDF[self.columnsX]
-
-        #Initiate the scaler
-
-        if self.globalFeatureSelection.scaler == 'MinMaxScaler':
-
-            scaler = MinMaxScaler()
-
-        scaler.fit(X)
-
-        #Scale the data as defined by the scaler
-        Xscaled = scaler.transform(X)
-
-        #Initiate  VarianceThreshold
-        select = VarianceThreshold(threshold=threshold)
-
-        #Fit the independent variables
-        select.fit(Xscaled)
-
-        #Get the selected features from get_support as a boolean list with True or False
-        selectedFeatures = select.get_support()
-
-        #Create a list to hold discarded columns
-        discardL = []
-
-        #Create a list to hold retained columns
-        self.retainL = []
-
-        if self.verbose:
-
-            print ('        Selecting features using VarianceThreshold, threhold =',threshold)
-
-            print ('            Scaling function MinMaxScaler:')
-
-        for sf in range(len(selectedFeatures)):
-
-            if selectedFeatures[sf]:
-                self.retainL.append([self.columnsX[sf],select.variances_[sf]])
-
-            else:
-                discardL.append([self.columnsX[sf],select.variances_[sf]])
-
-        self.globalFeatureSelectedD['method'] = 'varianceThreshold'
-        self.globalFeatureSelectedD['threshold'] = self.globalFeatureSelection.varianceThreshold.threshold
-        #self.globalFeatureSelectedD['scaler'] = self.globalFeatureSelection.scaler
-        self.globalFeatureSelectedD['nCovariatesRemoved'] = len(discardL)
-
-        varianceSelectTxt = '%s covariates removed with %s' %(len(discardL),'VarianceThreshold')
-
-        self.varianceSelectTxt = '%s: %s' %('VarianceThreshold',len(discardL))
-
-        if self.verbose:
-
-            print ('            ',varianceSelectTxt)
-
-            if self.verbose > 1:
-
-                #print the selected features and their variance
-                print ('            Discarded features [name, (variance):')
-
-                printL = ['%s (%.3f)'%(i[0],i[1]) for i in discardL]
-
-                for row in printL:
-                    print ('                ',row)
-
-                print ('            Retained features [name, (variance)]:')
-
-                printretainL = ['%s (%.3f)'%(i[0], i[1]) for i in self.retainL]
-
-                for row in printretainL:
-                    print ('                ',row)
-
-        self.retainL = [d[0] for d in self.retainL]
-
-
-
-        # Reset the covariate dataframe
-        self.spectraDF = self.spectraDF[ self.retainL ]
-
-    def _UnivariateSelector(self):
-        '''
-        '''
-        nfeatures = self.X.shape[1]
-
-        if self.targetFeatureSelection.univariateSelection.SelectKBest.apply:
-
-            n_features = self.targetFeatureSelection.univariateSelection.SelectKBest.n_features
-
-            if n_features >= nfeatures:
-
-                if self.verbose:
-
-                    infostr = '            SelectKBest: Number of features (%s) less than or equal to n_features (%s).' %(nfeatures,n_features)
-
-                    print (infostr)
-
-                return
-
-
-            select = SelectKBest(score_func=f_regression, k=n_features)
-
-        else:
-
-            return
-
-        # Select and fit the independent variables, return the selected array
-        X = select.fit_transform(self.X, self.y)
-
-        self.columns = select.get_feature_names_out()
-        # reset the covariates
-
-        self.X = pd.DataFrame(X, columns=self.columns)
-
-        self.targetFeatureSelectedD[self.targetFeature]['method'] ='SelectKBest'
-
-        self.targetFeatureSelectedD[self.targetFeature]['nFeaturesRemoved'] = nfeatures-self.X.shape[1]
-
-        self.targetFeatureSelectionTxt = '  %s removed %s' %( nfeatures-self.X.shape[1] ,'SelectKBest')
-
-        if self.verbose:
-
-            print ('\n            targetFeatureSelection:')
-
-            print ('                ',self.targetFeatureSelectionTxt)
-
-        if self.verbose > 1:
-
-            print ('                Selected features: %s' %(', '.join( select.get_feature_names_out() ) ) )
-
-    def _PermutationSelector(self):
-        '''
-        '''
-
-        nfeatures = self.X.shape[1]
-
-        n_features_to_select = self.modelFeatureSelection.RFE.n_features_to_select
-
-        if n_features_to_select >= nfeatures:
-
-            if self.verbose:
-
-                infostr = '            Number of features (%s) less than or equal to n_features_to_select (%s)' %(nfeatures,n_features_to_select)
-
-                print (infostr)
-
-            return
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        #Split the data into training and test subsets
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=self.modelTests.trainTest.testSize)
-
-        #Fit the model
-        model.fit(X_train, y_train)
-
-        permImportance = permutation_importance(model, X_test, y_test)
-
-        permImportanceMean = permImportance.importances_mean
-
-        sorted_idx = permImportanceMean.argsort()
-
-        self.columns = np.asarray(self.columns)[sorted_idx][::-1][0:n_features_to_select]
-
-        self.X = pd.DataFrame(self.X, columns=self.columns)
-
-        ####
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['method'] = 'PermutationSelector'
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['nFeaturesRemoved'] = nfeatures - self.X.shape[1]
-
-        self.modelFeatureSelectionTxt = '%s feat´s removed w. %s' %( nfeatures - self.X.shape[1], 'PermutationSelector')
-
-        if self.verbose:
-
-            print ('\n            modelFeatureSeelction:')
-
-            print ('                Regressor: %(m)s; Target feature: %(t)s' %{'m':name,'t':self.targetFeature})
-
-            print ('                ',self.modelFeatureSelectionTxt)
-
-        if self.verbose > 1:
-
-            print ('                Selected features: %s' %(', '.join(self.columns)))
-
-        self.modelSelectD[name] = self.columns
-
-    def _RFESelector(self):
-        '''
-        '''
-
-        nfeatures = self.X.shape[1]
-
-        n_features_to_select = self.modelFeatureSelection.RFE.n_features_to_select
-
-        if n_features_to_select >= nfeatures:
-
-            if self.verbose:
-
-                infostr = '            Number of features (%s) less than or equal to n_features_to_select (%s)' %(nfeatures,n_features_to_select)
-
-                print (infostr)
-
-            return
-
-        step = self.modelFeatureSelection.RFE.step
-
-        columns = self.X.columns
-
-        if self.verbose:
-
-            if self.modelFeatureSelection.RFE.CV:
-
-                metod = 'RFECV'
-
-                print ('\n            RFECV feature selection')
-
-            else:
-
-                metod = 'RFE'
-
-                print ('\n            RFE feature selection')
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        if self.modelFeatureSelection.RFE.CV:
-
-            select = RFECV(estimator=model, min_features_to_select=n_features_to_select, step=step)
-
-        else:
-
-            select = RFE(estimator=model, n_features_to_select=n_features_to_select, step=step)
-
-        select.fit(self.X, self.y)
-
-        selectedFeatures = select.get_support()
-
-        #Create a list to hold discarded columns
-        selectL = []; discardL = []
-
-        #print the selected features and their variance
-        for sf in range(len(selectedFeatures)):
-            if selectedFeatures[sf]:
-                selectL.append(columns[sf])
-
-            else:
-                discardL.append(columns[sf])
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['method'] = metod
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['nFeaturesRemoved'] = len( discardL)
-
-        self.modelFeatureSelectionTxt = '%s feat´s removed w. %s' %(len(discardL),'RFE')
-
-        if self.verbose:
-
-            print ('\n            modelFeatureSeelction:')
-
-            print ('                Regressor: %(m)s; Target feature: %(t)s' %{'m':name,'t':self.targetFeature})
-
-            print ('                ',self.modelFeatureSelectionTxt)
-
-        if self.verbose > 1:
-
-            print ('                Selected features: %s' %(', '.join(selectL)))
-
-        #self.modelSelectD[name] = selectL
-
-    def _RemoveOutliers(self):
-        """
-        """
-
-        #self.columnsX = [item for item in self.spectraDF.columns if item not in self.omitL]
-
-        self.columnsX = [item for item in self.spectraDF.columns]
-
-        # extract the covariate columns as X
-        X = self.spectraDF[self.columnsX]
-
-        iniSamples = X.shape[0]
-
-        if self.removeOutliers.detector.lower() in ['iforest','isolationforest']:
-
-            outlierDetector = IsolationForest(contamination=self.removeOutliers.contamination)
-
-        elif self.removeOutliers.detector.lower() in ['ee','eenvelope','ellipticenvelope']:
-
-            outlierDetector = EllipticEnvelope(contamination=self.removeOutliers.contamination)
-
-        elif self.removeOutliers.detector.lower() in ['lof','lofactor','localoutlierfactor']:
-
-            outlierDetector = LocalOutlierFactor(contamination=self.removeOutliers.contamination)
-
-        elif self.removeOutliers.detector.lower() in ['1csvm','1c-svm','oneclasssvm']:
-
-            outlierDetector = OneClassSVM(nu=self.removeOutliers.contamination)
-
-        else:
-
-            exit('unknown outlier detector')
-
-        # The warning "X does not have valid feature names" is issued, but it is a bug and will go in next version
-        yhat = outlierDetector.fit_predict(X)
-
-        # select all rows that are not outliers
-        #mask = yhat != -1
-
-        X['yhat'] = yhat
-
-        # Remove samples with outliers from the abudance array using the X array yhat columns
-        self.abundanceDf = self.abundanceDf[ X['yhat']==1 ]
-
-        # Keep only non-outliers in self.X
-        X = X[ X['yhat']==1 ]
-
-        # Drop the "yhat" columns for self.X
-        X = X.drop(['yhat'], axis=1)
-
-        self.spectraDF = pd.DataFrame(X)
-
-        postSamples = X.shape[0]
-
-        self.nOutliers = iniSamples - postSamples
-
-        self.outliersRemovedD['method'] = self.removeOutliers.detector
-        self.outliersRemovedD['nOutliersRemoved'] = self.nOutliers
-
-        self.outlierTxt = '%s outliers removed w. %s' %(self.nOutliers,self.removeOutliers.detector)
-
-        outlierTxt = '%s outliers removed' %(self.nOutliers)
-
-        if self.verbose:
-
-            print ('        ',outlierTxt)
-
-    def _WardClustering(self, n_clusters):
-        '''
-        '''
-
-        nfeatures = self.X.shape[1]
-
-        if nfeatures < n_clusters:
-
-            n_clusters = nfeatures
-
-        ward = FeatureAgglomeration(n_clusters=n_clusters)
-
-        #fit the clusters
-        ward.fit(self.X, self.y)
-
-        self.clustering =  ward.labels_
-
-        # Get a list of bands
-        bandsL =  list(self.X)
-
-        self.aggColumnL = []
-
-        self.aggBandL = []
-
-        for m in range(len(ward.labels_)):
-
-            indices = [bandsL[i] for i, x in enumerate(ward.labels_) if x == m]
-
-            if(len(indices) == 0):
-
-                break
-
-            self.aggColumnL.append(indices[0])
-
-            self.aggBandL.append( ', '.join(indices) )
-
-        self.agglomeratedFeaturesD['method'] = 'WardClustering'
-
-        self.agglomeratedFeaturesD['n_clusters'] = n_clusters
-
-        self.agglomeratedFeaturesD['tuneWardClusteringApplied'] = self.featureAgglomeration.wardClustering.tuneWardClustering.apply
-
-        agglomeratetxt = '%s input features clustered to %s covariates using  %s' %(len(self.columns),len(self.aggColumnL),self.agglomeratedFeaturesD['method'])
-
-        self.agglomerateTxt = '%s clustered from %s to %s Feat´s' %(self.agglomeratedFeaturesD['method'], len(self.columns),len(self.aggColumnL))
-
-        if self.verbose:
-
-            print ('\n                ',agglomeratetxt)
-
-            if self.verbose > 1:
-
-                print ('                Clusters:')
-
-                for x in range(len(self.aggColumnL)):
-
-                    print ('                    ',self.aggBandL[x])
-
-        # Reset the covariates (self.X)
-        X = ward.transform(self.X)
-
-        # Reset the main dataframe
-        self.spectraDF = pd.DataFrame(X, columns=self.aggColumnL)
-
-        # Reset the main column list
-        self.columns = self.aggColumnL
-
-        # reset the covariates
-        self.X = pd.DataFrame(X, columns=self.aggColumnL)
-
-    def _TuneWardClustering(self):
-        ''' Determines the optimal nr of cluster
-        '''
-        nfeatures = self.X.shape[1]
-
-        nClustersL = self.featureAgglomeration.wardClustering.tuneWardClustering.clusters
-
-        nClustersL = [c for c in nClustersL if c < nfeatures]
-
-        kfolds = self.featureAgglomeration.wardClustering.tuneWardClustering.kfolds
-
-        cv = KFold(kfolds)  # cross-validation generator for model selection
-
-        ridge = BayesianRidge()
-
-        cachedir = tempfile.mkdtemp()
-
-        mem = Memory(location=cachedir)
-
-        ward = FeatureAgglomeration(n_clusters=4, memory=mem)
-
-        clf = Pipeline([('ward', ward), ('ridge', ridge)])
-
-        # Select the optimal number of parcels with grid search
-        clf = GridSearchCV(clf, {'ward__n_clusters': nClustersL}, n_jobs=1, cv=cv)
-
-        clf.fit(self.X, self.y)  # set the best parameters
-
-        if self.verbose:
-
-            print ('            Report for tuning Ward Clustering')
-
-        #report the top three results
-        self._ReportSearch(clf.cv_results_,3)
-
-        #rerun with the best cluster agglomeration result
-        tunedClusters = clf.best_params_['ward__n_clusters']
-
-        if self.verbose:
-
-            print ('                Tuned Ward clusters:', tunedClusters)
-
-        return (tunedClusters)
-
-    def _RandomtuningParams(self,nFeatures):
-        ''' Set hyper parameters for random tuning
-        '''
-        self.paramDist = {}
-
-        self.HPtuningtxt = 'Random tuning'
-
-        # specify parameters and distributions to sample from
-        name,model = self.regrModel
-
-        if name == 'KnnRegr':
-
-            self.paramDist[name] = {"n_neighbors": sp_randint(self.hyperParams.RandomTuning.KnnRegr.n_neigbors.min,
-                                                              self.hyperParams.RandomTuning.KnnRegr.n_neigbors.max),
-                          'leaf_size': sp_randint(self.hyperParams.RandomTuning.KnnRegr.leaf_size.min,
-                                                              self.hyperParams.RandomTuning.KnnRegr.leaf_size.max),
-                          'weights': self.hyperParams.RandomTuning.KnnRegr.weights,
-                          'p': self.hyperParams.RandomTuning.KnnRegr.weights,
-                          'algorithm': self.hyperParams.RandomTuning.KnnRegr.algorithm}
-
-        elif name =='DecTreeRegr':
-            # Convert 0 to None for max_depth
-
-            max_depth = [m if m > 0 else None for m in self.hyperParams.RandomTuning.DecTreeRegr.max_depth]
-
-            self.paramDist[name] = {"max_depth": max_depth,
-                        "min_samples_split": sp_randint(self.hyperParams.RandomTuning.DecTreeRegr.min_samples_split.min,
-                                                        self.hyperParams.RandomTuning.DecTreeRegr.min_samples_split.max),
-                        "min_samples_leaf": sp_randint(self.hyperParams.RandomTuning.DecTreeRegr.min_samples_leaf.min,
-                                                        self.hyperParams.RandomTuning.DecTreeRegr.min_samples_leaf.max)}
-        elif name =='SVR':
-
-            self.paramDist[name] = {"kernel": self.hyperParams.RandomTuning.SVR.kernel,
-                                    "epsilon": self.hyperParams.RandomTuning.SVR.epsilon,
-                                    "C": self.hyperParams.RandomTuning.SVR.epsilon}
-
-        elif name =='RandForRegr':
-
-            max_depth = [m if m > 0 else None for m in self.hyperParams.RandomTuning.RandForRegr.tuningParams.max_depth]
-
-            max_features_max = min(self.hyperParams.RandomTuning.RandForRegr.tuningParams.max_features.max,nFeatures)
-
-            max_features_min = min(self.hyperParams.RandomTuning.RandForRegr.tuningParams.max_features.min,nFeatures)
-
-            self.paramDist[name] = {"max_depth": max_depth,
-                          "n_estimators": sp_randint(self.hyperParams.RandomTuning.RandForRegr.tuningParams.n_estimators.min,
-                                                              self.hyperParams.RandomTuning.RandForRegr.tuningParams.n_estimators.max),
-                          "max_features": sp_randint(max_features_min,
-                                                              max_features_max),
-                          "min_samples_split": sp_randint(self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_split.min,
-                                                              self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_split.max),
-                          "min_samples_leaf": sp_randint(self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_leaf.min,
-                                                              self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_leaf.max),
-                          "bootstrap": self.hyperParams.RandomTuning.RandForRegr.bootstrap}
-
-        elif name =='MLP':
-
-            self.paramDist[name] = {
-                        "hidden_layer_sizes": self.hyperParams.RandomTuning.MLP.hidden_layer_sizes,
-                        "solver": self.hyperParams.RandomTuning.MLP.solver,
-                        "alpha": sp_randint(self.hyperParams.RandomTuning.MPL.tuningParams.alpha.min,
-                                    self.hyperParams.RandomTuning.MPL.tuningParams.alpha.max),
-                        "max_iter": sp_randint(self.hyperParams.RandomTuning.MPL.tuningParams.max_iter.min,
-                                    self.hyperParams.RandomTuning.MPL.tuningParams.max_iter.max)}
-
-    def _ExhaustivetuningParams(self,nFeatures):
-        '''
-        '''
-
-        self.HPtuningtxt = 'Exhasutive tuning'
-
-        # specify parameters and distributions to sample from
-        self.paramGrid = {}
-
-        name,model = self.regrModel
-
-        if name == 'KnnRegr':
-
-            self.paramGrid[name] = [{"n_neighbors": self.hyperParams.ExhaustiveTuning.KnnRegr.tuningParams.n_neigbors,
-                               'weights': self.hyperParams.ExhaustiveTuning.KnnRegr.tuningParams.weights,
-                               'algorithm': self.hyperParams.ExhaustiveTuning.KnnRegr.tuningParams.algorithm,
-                               'leaf_size': self.hyperParams.ExhaustiveTuning.KnnRegr.tuningParams.leaf_size,
-                               'p': self.hyperParams.ExhaustiveTuning.KnnRegr.tuningParams.p}
-                               ]
-        elif name =='DecTreeRegr':
-            max_depth = [m if m > 0 else None for m in self.hyperParams.ExhaustiveTuning.DecTreeRegr.tuningParams.max_depth]
-
-            self.paramGrid[name] = [{
-                                "splitter": self.hyperParams.ExhaustiveTuning.DecTreeRegr.tuningParams.splitter,
-                                "max_depth": self.hyperParams.ExhaustiveTuning.DecTreeRegr.tuningParams.max_depth,
-                                "min_samples_split": self.hyperParams.ExhaustiveTuning.DecTreeRegr.tuningParams.min_samples_split,
-                                "min_samples_leaf": self.hyperParams.ExhaustiveTuning.DecTreeRegr.tuningParams.min_samples_leaf}]
-
-        elif name =='SVR':
-            self.paramGrid[name] = [{"kernel": self.hyperParams.ExhaustiveTuning.SVR.tuningParams.kernel,
-                                "epsilon": self.hyperParams.ExhaustiveTuning.SVR.tuningParams.epsilon,
-                                "C": self.hyperParams.ExhaustiveTuning.SVR.tuningParams.C
-                              }]
-
-        elif name =='RandForRegr':
-            max_depth = [m if m > 0 else None for m in self.hyperParams.ExhaustiveTuning.RandForRegr.tuningParams.max_depth]
-
-            self.paramGrid[name] = [{
-                            "max_depth": max_depth,
-                          "n_estimators": self.hyperParams.ExhaustiveTuning.RandForRegr.tuningParams.n_estimators,
-                          "min_samples_split": self.hyperParams.ExhaustiveTuning.RandForRegr.tuningParams.min_samples_split,
-                          "min_samples_leaf": self.hyperParams.ExhaustiveTuning.RandForRegr.tuningParams.min_samples_leaf,
-                          "bootstrap": self.hyperParams.ExhaustiveTuning.RandForRegr.tuningParams.bootstrap}]
-
-        elif name =='MLP':
-            self.paramGrid[name] = [{
-                        "hidden_layer_sizes": self.hyperParams.ExhaustiveTuning.MLP.tuningParams.hidden_layer_sizes,
-                        "solver": self.hyperParams.ExhaustiveTuning.MLP.tuningParams.solver,
-                        "alpha": self.hyperParams.ExhaustiveTuning.MLP.tuningParams.alpha,
-                        "max_iter": self.hyperParams.ExhaustiveTuning.MLP.tuningParams.max_iter}]
-
-    def _RandomTuning(self):
-        '''
-        '''
-
-        #Retrieve the model name and the model itself
-        name,mod = self.regrModel
-
-        nFeatures = self.X.shape[1]
-
-        # Get the tuning parameters
-        self._RandomtuningParams(nFeatures)
-
-        if self.verbose:
-
-            print ('\n                HyperParameter random tuning:')
-
-            print ('                    ',name, self.paramDist[name])
-
-        search = RandomizedSearchCV(mod, param_distributions=self.paramDist[name],
-                                           n_iter=self.params.hyperParameterTuning.nIterSearch)
-
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=(1-self.params.hyperParameterTuning.fraction))
-
-        search.fit(X_train, y_train)
-
-        resultD = self._ReportSearch(search.cv_results_,self.params.hyperParameterTuning.n_best_report)
-
-        self.tunedHyperParamsD[self.targetFeature][name] = resultD
-
-        # Set the hyperParameters to the best result
-        for key in resultD[1]['hyperParameters']:
-
-            self.jsonparamsD['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
-
-    def _ExhaustiveTuning(self):
-        '''
-        '''
-
-        #Retrieve the model name and the model itself
-        name,mod = self.regrModel
-
-        nFeatures = self.X.shape[1]
-
-        # Get the tuning parameters
-        self._ExhaustivetuningParams(nFeatures)
-
-        if self.verbose:
-
-            print ('\n                HyperParameter exhaustive tuning:')
-
-            print ('                    ',name, self.paramGrid[name])
-
-        search = GridSearchCV(mod, param_grid=self.paramGrid[name])
-
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=(1-self.params.hyperParameterTuning))
-
-        search.fit(X_train, y_train)
-
-        resultD = self._ReportSearch(search.cv_results_,self.params.hyperParameterTuning.n_best_report)
-
-        self.tunedHyperParamsD[self.targetFeature][name] = resultD
-
-        # Set the hyperParameters to the best result
-        for key in resultD[1]['hyperParameters']:
-
-            self.jsonparamsD['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
-
-    def _ReportRegModelParams(self):
-        '''
-        '''
-
-        print ('            Model hyper-parameters:')
-
-        for model in self.regressorModels:
-
-            #Retrieve the model name and the model itself
-            modelname,modelhyperparams = model
-
-            print ('                name', modelname, modelhyperparams.get_params())
-
-    def _ReportSearch(self, results, n_top=3):
-        '''
-        '''
-
-        resultD = {}
-        for i in range(1, n_top + 1):
-
-            resultD[i] = {}
-
-            candidates = np.flatnonzero(results['rank_test_score'] == i)
-
-            for candidate in candidates:
-
-                resultD[i]['mean_test_score'] = results['mean_test_score'][candidate]
-
-                resultD[i]['std'] = round(results['std_test_score'][candidate],4)
-
-                resultD[i]['std'] = round(results['std_test_score'][candidate],4)
-
-                resultD[i]['hyperParameters'] = results['params'][candidate]
-
-                if self.verbose:
-
-                    print("                    Model with rank: {0}".format(i))
-
-                    print("                    Mean validation score: {0:.3f} (std: {1:.3f})".format(
-                          results['mean_test_score'][candidate],
-                          results['std_test_score'][candidate]))
-
-                    print("                    Parameters: {0}".format(results['params'][candidate]))
-
-                    print("")
-
-        return resultD
-
-class MachineLearningModel(Obj, RegressionModels):
-    ''' MAchine Learning model of feature propertie from spectra
+class ImportOSSL(Obj):
+    ''' import soil spectra from OSSL to xSpectre json format
     '''
 
     def __init__(self,paramD):
-        """ Convert input parameters from nested dict to nested class object
+        ''' Initiate import OSSl class
 
-            :param dict paramD: parameters
-        """
+        :param dict param: input parameters
+        '''
 
         # convert the input parameter dict to class objects
         Obj.__init__(self,paramD)
 
-        # initiate the regression models
-        RegressionModels.__init__(self)
+        # Set class object default data if missing
+        self._SetArrangeDefautls()
 
-        self.paramD = paramD
-
-        # Set class object default data if required
-        self._SetModelDefaults()
-
-        # Deep copy parameters to a new object class called params
+        # Deep copy parameters to a new obejct class called params
         self.params = deepcopy(self)
 
-        # Drop the plot and figure settings from paramD
-        paramD.pop('plot')
-
-        # Deep copy the parameters to self.soillineD
-        self.plotD = deepcopy(paramD)
-                
-    def _SetSrcFPNs(self, rootFP, dstRootFP, sourcedatafolder):
+    def _SetSrcFPNs(self, rootFP, sourcedatafolder):
         ''' Set source file paths and names
         '''
 
         # All OSSL data are download as a zipped subfolder with data given standard names as of below
                
-        # if the path to rootFP starts with a dot '.' (= self) then use the default rootFP 
-        if self.input.jsonSpectraDataFilePath[0] == '.':
+        # if the path to rootFP is set to a dot '.' (= self) then use the default rootFP 
+        if self.params.rootFP == '.':
             
-            removeStart = 1
-            
-            if self.input.jsonSpectraDataFilePath[1] in ['/']:
-                
-                removeStart = 2
-            
-            dataSubFP = self.input.jsonSpectraDataFilePath[removeStart: len(self.input.jsonSpectraDataFilePath)]
-               
-            jsonSpectraDataFilePath = os.path.join(dstRootFP, dataSubFP)
-            
-        else:
-            
-            jsonSpectraDataFilePath = self.input.jsonSpectraDataFilePath
-            
-        if self.input.jsonSpectraParamsFilePath[0] == '.':
-            
-            removeStart = 1
-            
-            if self.input.jsonSpectraParamsFilePath[1] in ['/']:
-                
-                removeStart = 2
-            
-            paramSubFP = self.input.jsonSpectraParamsFilePath[removeStart: len(self.input.jsonSpectraParamsFilePath)]
-               
-            jsonSpectraParamsFilePath = os.path.join(dstRootFP, paramSubFP)
-            
+            self.srcSoilSiteFPN = os.path.join(rootFP,sourcedatafolder,'soilsite.data.csv')
+        
+            self.srcVISNIRFPN = os.path.join(rootFP,sourcedatafolder,'visnir.data.csv')
+
+            self.srcMIRFPN = os.path.join(rootFP,sourcedatafolder,'mir.data.csv')
+    
+            self.srcNEONFPN = os.path.join(rootFP,sourcedatafolder,'neon.data.csv')
+    
+            self.srcSoilLabFPN = os.path.join(rootFP,sourcedatafolder,'soillab.data.csv')
 
         else:
         
-            jsonSpectraParamsFilePath = self.input.jsonSpectraParamsFilePath
-            
-        if not os.path.exists(jsonSpectraDataFilePath):
-            
-            exitStr = 'Data file not found: %s ' %(jsonSpectraDataFilePath)
-            
-            exit(exitStr)
-
-        if not os.path.exists(jsonSpectraParamsFilePath):
-            
-            exitStr = 'Param file not found: %s ' %(jsonSpectraParamsFilePath)
-            
-            exit(exitStr)
-            
-        self.dataFPN = jsonSpectraDataFilePath
+            self.srcSoilSiteFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soilsite.data.csv')
         
-        # Open and load JSON data file
-        with open(jsonSpectraDataFilePath) as jsonF:
+            self.srcVISNIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'visnir.data.csv')
 
-            self.jsonSpectraData = json.load(jsonF)
+            self.srcMIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'mir.data.csv')
+    
+            self.srcNEONFPN = os.path.join(self.params.rootFP,sourcedatafolder,'neon.data.csv')
+    
+            self.srcSoilLabFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soillab.data.csv')
 
-        # Open and load JSON parameter file
-        with open(jsonSpectraParamsFilePath) as jsonF:
-
-            self.jsonSpectraParams = json.load(jsonF)
-            
-    def _SetColorRamp(self,n):
-        ''' Slice predefined colormap to discrete colors for each band
+    def _SetProjectNameId(self):
+        ''' Set project name and id if they are not user defined
         '''
 
-        # Set colormap to use for plotting
-        cmap = plt.get_cmap(self.plot.colorramp)
+        if self.params.name in ['auto','']:
 
-        # Segmenting colormap to the number of bands
-        self.slicedCM = cmap(np.linspace(0, 1, n))
+            self.params.name = self.campaign.campaignShortId
 
-    def _GetAbundanceData(self):
-        '''
-        '''
+        if self.params.id in ['auto','']:
 
-        # Get the list of substances included in this dataset
+            self.params.id = '%s_%s' %(self.params.name,Today())
 
-        substanceColumns = self.jsonSpectraParams['labData']
-
-        #substanceColumns = self.jsonSpectraParams['targetFeatures']
-
-        substanceOrderD = {}
-
-        for substance in substanceColumns:
-
-            substanceOrderD[substance] = substanceColumns.index(substance)
-
-        n = 0
-
-        # Loop over the samples
-        for sample in self.jsonSpectraData['spectra']:
-
-            substanceL = [None] * len(substanceColumns)
-
-            for abundance in sample['abundances']:
-
-                substanceL[ substanceOrderD[abundance['substance']] ] = abundance['value']
-
-            if n == 0:
-
-                abundanceA = np.asarray(substanceL, dtype=float)
-
-            else:
-
-                abundanceA = np.vstack( (abundanceA, np.asarray(substanceL, dtype=float) ) )
-
-            n += 1
-
-        self.abundanceDf = pd.DataFrame(data=abundanceA, columns=substanceColumns)
-
-    def _StartStepSpectra(self, pdSpectra, startwl, stopwl, stepwl):
-        '''
-        '''
-
-        wlmin = pdSpectra['wl'].min()
-        wlmax = pdSpectra['wl'].max()
-        step = (wlmax-wlmin)/(pdSpectra.shape[0])
-
-        startindex = (startwl-wlmin)/step
-
-        stopindex = (stopwl-wlmin)/step
-
-        stepindex = stepwl/step
-
-        indexL = []; iL = []
-
-        i = 0
-
-        while True:
-
-            if i*stepindex+startindex > stopindex+1:
-
-                break
-
-            indexL.append(int(i*stepindex+startindex))
-            iL.append(i)
-
-            i+=1
-
-        df = pdSpectra.iloc[indexL]
-
-        return df, indexL[0]
-
-    def _SpectraDerivativeFromDf(self,dataFrame,columns):
-        ''' Create spectral derivates
-        '''
-
-        # Get the derivatives
-        spectraDerivativeDF = dataFrame.diff(axis=1, periods=1)
-
-        # Drop the first column as it will have only NaN
-        spectraDerivativeDF = spectraDerivativeDF.drop(columns[0], axis=1)
-
-        # Reset columns to integers
-        columns = [int(i) for i in columns]
-
-        # Create the derivative columns
-        derivativeColumns = ['d%s' % int((columns[i-1]+columns[i])/2) for i in range(len(columns)) if i > 0]
-
-        # Replace the columns
-        spectraDerivativeDF.columns = derivativeColumns
-
-        return spectraDerivativeDF, derivativeColumns
-
-    def _GetBandData(self):
-        ''' Read json data into numpy array and convert to pandas dataframe
-        '''
-        self.varianceSelectTxt = None; self.outlierTxt = None
-        self.targetFeatureSelectionTxt = None; self.agglomerateTxt = None
-        self.modelFeatureSelectionTxt = None
-
-        # Use the wavelength as column headers
-        self.columns = self.jsonSpectraData['waveLength']
-
-        # Convert the column headers to strings
-        self.columns = [str(c) for c in self.columns]
-
-        n = 0
-
-        # Loop over the spectra
-        for sample in self.jsonSpectraData['spectra']:
-
-            if n == 0:
-
-                spectraA = np.asarray(sample['signalMean'])
-
-            else:
-
-                spectraA = np.vstack( (spectraA, np.asarray(sample['signalMean']) ) )
-
-            n += 1
-
-        self.spectraDF = pd.DataFrame(data=spectraA, columns=self.columns)
-
-        if self.derivatives.apply:
-
-            spectraDerivativeDF,derivativeColumns = self._SpectraDerivativeFromDf(self.spectraDF, self.columns)
-
-            if self.derivatives.join:
-
-                frames = [self.spectraDF, spectraDerivativeDF]
-
-                self.spectraDF = pd.concat(frames, axis=1)
-
-                self.columns.extend(derivativeColumns)
-
-            else:
-
-                self.spectraDF = spectraDerivativeDF
-
-                self.columns = derivativeColumns
-
-        self.originalColumns = self.columns
-
-    def _SetSubPlots(self):
-        '''
-        '''
-
-        #regressionModelTitleTranslateD = {'permutationImportance': 'Permutation importance', 'Kfold': 'Kfold model','trainTest': 'train/test model'}
-
-        #targetFeatureTitleTranslateD = {'permutationImportance': 'Permutation importance', 'Kfold': 'Kfold model','trainTest': 'train/test model'}
-
-        if self.plot.rows.apply:
-
-            self.nRegrModels = len(self.regressorModels)
-
-            self.nTargetFeatures = len(self.targetFeatures)
-
-            self.columnFig = {}
-
-            self.columnAxs = {}
-
-            if self.plot.rows.targetFeatures.apply:
-
-                self.targetFeaturePlotColumnD = {}
-
-                for c, col in enumerate(self.plot.rows.targetFeatures.columns):
-
-                    self.targetFeaturePlotColumnD[col] = c
-
-                self.targetFeaturesFigCols = len(self.plot.rows.targetFeatures.columns)
-
-                # Set the figure size
-
-                xadd = self.plot.rows.targetFeatures.figSize.xadd
-
-                if  xadd == 0:
-
-                    xadd = self.plot.rows.subFigSize.xadd
-
-                if self.plot.rows.targetFeatures.figSize.x == 0:
-
-                    figSizeX = self.plot.rows.subFigSize.x * self.targetFeaturesFigCols + xadd
-
-                else:
-
-                    figSizeX = self.plot.rows.targetFeatures.figSize.x
-
-                yadd = self.plot.rows.targetFeatures.figSize.yadd
-
-                if  yadd == 0:
-
-                    yadd = self.plot.rows.subFigSize.yadd
-
-                if self.plot.rows.targetFeatures.figSize.y == 0:
-
-                    figSizeY = self.plot.rows.subFigSize.y * self.nTargetFeatures + yadd
-
-                else:
-
-                    figSizeY = self.plot.rows.targetFeatures.figSize.y
-
-                # Create column plots for individual targetFeatures, with rows showing different regressors
-                for regrModel in self.regressorModels:
-
-                    self.columnFig[regrModel[0]], self.columnAxs[regrModel[0]] = plt.subplots( self.nTargetFeatures, self.targetFeaturesFigCols, figsize=(figSizeX, figSizeY) )
-
-                    if self.plot.tightLayout:
-
-                        self.columnFig[regrModel[0]].tight_layout()
-
-                    # Set title
-                    suptitle = "Regressor: %s, %s (rows=target features)\n" %(regrModel[0], self.hyperParamtxt)
-
-                    suptitle += '%s input features' %(len(self.originalColumns))
-
-                    # Set subplot wspace and hspace
-                    if self.plot.rows.regressionModels.hwspace.wspace:
-
-                        self.columnFig[regrModel[0]].subplots_adjust(wspace=self.plot.rows.regressionModels.hwspace.wspace)
-
-                    if self.plot.rows.regressionModels.hwspace.hspace:
-
-                        self.columnFig[regrModel[0]].subplots_adjust(hspace=self.plot.rows.regressionModels.hwspace.hspace)
-
-                    if self.varianceSelectTxt != None:
-
-                        suptitle += ', %s' %(self.varianceSelectTxt)
-
-                    if self.outlierTxt != None:
-
-                        suptitle +=  ', %s' %(self.outlierTxt)
-
-                    self.columnFig[regrModel[0]].suptitle(  suptitle )
-
-                    for r,rows in enumerate(self.targetFeatures):
-
-                        for c,cols in enumerate(self.plot.rows.targetFeatures.columns):
-
-                            # Set subplot titles:
-                            if 'Importance' in cols:
-
-                                if r == 0:
-
-                                    title = '%s' %( cols.replace('Importance', ' Importance'))
-
-                                    if (len(self.targetFeatures)) == 1:
-
-                                        self.columnAxs[ regrModel[0] ][c].set_title(title)
-
-                                    else:
-
-                                        self.columnAxs[ regrModel[0] ][r,c].set_title(title)
-
-                            else:
-
-                                title = '%s %s' %( self.paramD['targetFeatureSymbols'][rows]['label'], cols)
-
-                                if (len(self.targetFeatures)) == 1:
-
-                                    self.columnAxs[ regrModel[0] ][c].set_title(title)
-
-                                else:
-
-                                    self.columnAxs[ regrModel[0] ][r,c].set_title(title)
-
-            if self.plot.rows.regressionModels.apply:
-
-                self.regressionModelPlotColumnD = {}
-
-                for c, col in enumerate(self.plot.rows.regressionModels.columns):
-
-                    self.regressionModelPlotColumnD[col] = c
-
-                self.regressionModelFigCols = len(self.plot.rows.regressionModels.columns)
-
-                # Set the figure size
-
-                xadd = self.plot.rows.regressionModels.figSize.xadd
-
-                if  xadd == 0:
-
-                    xadd = self.plot.rows.subFigSize.xadd
-
-                if self.plot.rows.regressionModels.figSize.x == 0:
-
-                    figSizeX = self.plot.rows.subFigSize.x * self.regressionModelFigCols + xadd
-
-                else:
-
-                    figSizeX = self.plot.rows.regressionModels.figSize.x
-
-                yadd = self.plot.rows.regressionModels.figSize.yadd
-
-                if  yadd == 0:
-
-                    yadd = self.plot.rows.subFigSize.yadd
-
-                if self.plot.rows.regressionModels.figSize.y == 0:
-
-                    figSizeY = self.plot.rows.subFigSize.y * self.nRegrModels + yadd
-
-                else:
-
-                    figSizeY = self.plot.rows.regressionModels.figSize.x
-
-                # Create column plots for individual regressionModels, with rows showing different regressors
-                for targetFeature in self.targetFeatures:
-
-                    self.columnFig[targetFeature], self.columnAxs[targetFeature] = plt.subplots( self.nRegrModels, self.regressionModelFigCols, figsize=(figSizeX, figSizeY))
-
-                    # ERROR If only one regressionModle then r == NONE
-
-                    if self.plot.tightLayout:
-
-                        self.columnFig[targetFeature].tight_layout()
-
-                    # Set subplot wspace and hspace
-                    if self.plot.rows.targetFeatures.hwspace.wspace:
-
-                        self.columnFig[targetFeature].subplots_adjust(wspace=self.plot.rows.targetFeatures.hwspace.wspace)
-
-                    if self.plot.rows.targetFeatures.hwspace.hspace:
-
-                        self.columnFig[targetFeature].subplots_adjust(hspace=self.plot.rows.targetFeatures.hwspace.hspace)
-
-                    label = self.paramD['targetFeatureSymbols'][targetFeature]['label']
-
-                    suptitle = "Target: %s, %s (rows=regressors)\n" %(label, self.hyperParamtxt )
-
-                    suptitle += '%s input features' %(len(self.originalColumns))
-
-                    if self.varianceSelectTxt != None:
-
-                        suptitle += ', %s' %(self.varianceSelectTxt)
-
-                    if self.outlierTxt != None:
-
-                        suptitle +=  ', %s' %(self.outlierTxt)
-
-                    # Set suotitle
-                    self.columnFig[targetFeature].suptitle( suptitle )
-
-                    # Set subplot titles:
-                    for r,rows in enumerate(self.regressorModels):
-
-                        for c,cols in enumerate(self.plot.rows.regressionModels.columns):
-
-                            #title = '%s %s' %(rows[0], cols)
-
-                            # Set subplot titles:
-                            if 'Importance' in cols:
-
-                                if r == 0:
-
-                                    title = '%s' %( cols.replace('Importance', ' Importance'))
-
-                                    if (len(self.regressorModels)) == 1:
-
-                                        self.columnAxs[targetFeature][c].set_title( title )
-
-                                    else:
-
-                                        self.columnAxs[targetFeature][r,c].set_title( title )
-
-                            else:
-
-                                title = '%s %s' %(rows[0], cols)
-                                #title = '%s ' %( self.paramD['targetFeatureSymbols'][rows]['label'], cols)
-                                if (len(self.regressorModels)) == 1:
-
-                                    self.columnAxs[targetFeature][c].set_title( title )
-
-                                else:
-
-                                    self.columnAxs[targetFeature][r,c].set_title( title )
-
-                            #regressionModelTitleTranslateD = {'permutationImportance': 'Permutation importance', 'Kfold': 'Kfold model','trainTest': 'train/test model'}
-
-    def _SetDstFPNs(self):
+    def _SetDstFPN(self, dstRootFP, band, subFP):
         ''' Set destination file paths and names
+
+            :param str dstRootFP: destination root directory path
+
+            :param str band: the spectral region of the destination data
+
+            :param str subfp: the subfolder of the destination data
+
         '''
 
-        FP,FN = os.path.split(self.dataFPN)
+        # Get the band [visnir, mir , neon] object
+        bandObject = getattr(self, band)
 
-        FN = os.path.splitext(FN)[0]
+        beginWaveLength = getattr(bandObject, 'beginWaveLength')
 
-        #self.name = FN.split('_', 1)[1]
+        endWaveLength = getattr(bandObject, 'endWaveLength')
 
-        modelFP = os.path.join(FP,'mlmodel')
+        inputBandWidth = getattr(bandObject, 'inputBandWidth')
 
-        if not os.path.exists(modelFP):
+        outputBandWidth = getattr(bandObject, 'outputBandWidth')
 
-            os.makedirs(modelFP)
+        # Calculate the column and wavelength step
+        columnsStep = int(outputBandWidth / inputBandWidth)
 
+        wlStep = int(columnsStep*inputBandWidth)
 
-        modelresultFP = os.path.join(modelFP,'json')
+        projectSubFP = '%s_%s-%s_%s' %(self.params.name,
+                        beginWaveLength, endWaveLength, wlStep)
 
-        if not os.path.exists(modelresultFP):
+        FP = os.path.join(dstRootFP, subFP,projectSubFP)
 
-            os.makedirs(modelresultFP)
+        if not os.path.exists(FP):
 
-        pickleFP = os.path.join(modelFP,'pickle')
+            os.makedirs(FP)
 
-        if not os.path.exists(pickleFP):
+        modelN = '%s_%s-%s_%s' %(os.path.split(self.params.rootFP)[1],
+                        beginWaveLength, endWaveLength, wlStep)
 
-            os.makedirs(pickleFP)
+        paramFN = 'params-%s_%s.json' %(band, modelN)
 
-        modelimageFP = os.path.join(modelFP,'images')
+        paramFPN = os.path.join(FP, paramFN)
 
-        if not os.path.exists(modelimageFP):
+        dataFN = 'data-%s_%s.json' %(band, modelN)
 
-            os.makedirs(modelimageFP)
+        dataFPN = os.path.join(FP, dataFN)
 
-        # if prefix is given it will be added to all output files
-        if len(self.output.prefix) > 0 and self.output.prefix[len(self.output.prefix)-1] != '_':
+        return (modelN, paramFPN, dataFPN, columnsStep, wlStep)
 
-            prefix = '%s_' %(self.output.prefix)
+    def _DumpSpectraJson(self, exportD, dataFPN, paramFPN, band):
+        ''' Export, or dump, the imported VINSNIR OSSL data as json objects
 
-        else:
+        :param exportD dict: formatted dictionary
 
-            prefix = self.output.prefix
+        :param dataFPN str: full path to destination json datafile
 
-        regrJsonFN = '%s%s_results.json' %(prefix, self.name)
+        :param paramFPN str: full path to destination json parameter file
 
-        self.regrJsonFPN = os.path.join(modelresultFP,regrJsonFN)
-
-        paramJsonFN = '%s%s_params.json' %(prefix,self.name)
-
-        self.paramJsonFPN = os.path.join(modelresultFP,paramJsonFN)
-
-        self.imageFPND = {}
-
-        # the picke files save the regressor models for later use
-        self.trainTestPickleFPND = {}
-
-        self.KfoldPickleFPND = {}
-        
-        # loop over targetfeatures
-        for targetFeature in self.paramD['targetFeatures']:
-
-            self.imageFPND[targetFeature] = {}
-
-            self.trainTestPickleFPND[targetFeature] = {}; self.KfoldPickleFPND[targetFeature] = {}
-
-            for regmodel in self.paramD['regressionModels']:
-
-                trainTestPickleFN = '%s%s_%s_%s_trainTest.xsp'    %(prefix,'modelid',targetFeature, regmodel)
-
-                KfoldPickleFN = '%s%s_%s_%s_Kfold.xsp'    %(prefix,'modelid',targetFeature, regmodel)
-
-                self.trainTestPickleFPND[targetFeature][regmodel] = os.path.join(pickleFP, trainTestPickleFN)
-
-                self.KfoldPickleFPND[targetFeature][regmodel] = os.path.join(pickleFP, KfoldPickleFN)
-
-                self.imageFPND[targetFeature][regmodel] = {}
-
-                if self.featureImportance.apply:
-
-                    self.imageFPND[targetFeature][regmodel]['featureImportance'] = {}
-
-                    imgFN = '%s%s_%s-model_permut-imp.png'    %(prefix,targetFeature, regmodel)
-
-                    self.imageFPND[targetFeature][regmodel]['featureImportance']['permutationImportance'] = os.path.join(modelimageFP, imgFN)
-
-                    imgFN = '%s%s_%s-model_feat-imp.png'    %(prefix,targetFeature, regmodel)
-
-                    self.imageFPND[targetFeature][regmodel]['featureImportance']['regressionImportance'] = os.path.join(modelimageFP, imgFN)
-
-                if self.modelTests.trainTest.apply:
-
-                    imgFN = '%s%s_%s-model_tt-result.png'    %(prefix,targetFeature, regmodel)
-
-                    self.imageFPND[targetFeature][regmodel]['trainTest'] = os.path.join(modelimageFP, imgFN)
-
-                if self.modelTests.Kfold.apply:
-
-                    imgFN = '%s%s_%s-model_kfold-result.png'    %(prefix,targetFeature, regmodel)
-
-                    self.imageFPND[targetFeature][regmodel]['Kfold'] = os.path.join(modelimageFP, imgFN)
-
-            # Set multi row-image file names, per targetfeature
-            imgFN = '%s%s-multi-results.png'    %(prefix, targetFeature)
-
-            self.imageFPND[targetFeature]['allmodels'] = os.path.join(modelimageFP, imgFN)
-
-        for regmodel in self.paramD['regressionModels']:
-
-            self.imageFPND[regmodel] = {}
-
-            # Set multi row-image file names, per regression model
-            imgFN = '%s%s-multi-results.png'    %(prefix, regmodel)
-
-            self.imageFPND[regmodel]['alltargets'] = os.path.join(modelimageFP, imgFN)
-
-
-    def _DumpJson(self):
-        '''
+        :param str band: the spectral region of the destination data
         '''
 
-        resultD = {}
+        jsonF = open(dataFPN, "w")
 
-        resultD['originalInputColumns'] = len(self.originalColumns)
+        json.dump(exportD, jsonF, indent = 2)
 
-        if self.removeOutliers.apply or self.globalFeatureSelection.apply or self.featureAgglomeration.apply:
+        jsonF.close()
 
-            resultD['globalTweaks']= {}
+        D = json.loads(json.dumps(self.params, default=lambda o: o.__dict__))
 
-            if self.removeOutliers.apply:
+        if self.verbose > 1:
 
-                resultD['globalTweaks']['removeOutliers'] = self.outliersRemovedD
+            pp = pprint.PrettyPrinter(indent=1)
 
-            if self.globalFeatureSelection.apply:
+            pp.pprint(D)
 
-                resultD['globalTweaks']['globalFeatureSelection'] = self.globalFeatureSelectedD
+        jsonF = open(paramFPN, "w")
 
-            if self.featureAgglomeration.apply:
+        json.dump(D, jsonF, indent = 2)
 
-                resultD['globalTweaks']['featureAgglomeration'] = self.agglomeratedFeaturesD
+        jsonF.close()
 
-        if self.manualFeatureSelection.apply:
+        if self.verbose:
 
-            resultD['manualFeatureSelection'] = True
+            infostr =  '        %s extraction parameters saved as: %s' %(band, paramFPN)
 
-        if self.targetFeatureSelection.apply:
+            print (infostr)
 
-            resultD['targetFeatureSelection'] = self.targetFeatureSelectedD
+            infostr =  '        %s extracted data saved as: %s' %(band, dataFPN)
 
-        if self.modelFeatureSelection.apply:
+            print (infostr)
 
-            resultD['modelFeatureSelection'] = self.modelFeatureSelectedD
+    def _ExtractSiteData(self, headers, rowL):
+        ''' Exract the site data (ossl file: "soilsite.data.csv")
 
-        if self.featureImportance:
+            :paramn headers: list of columns
+            :type: list
 
-            resultD['featureImportance'] = self.modelFeatureImportanceD
-
-        if self.hyperParameterTuning.apply:
-
-            resultD['hyperParameterTuning'] = {}
-
-            if self.hyperParameterTuning.randomTuning.apply:
-
-                # Set the results from the hyperParameter Tuning
-                resultD['hyperParameterTuning']['randomTuning'] = self.tunedHyperParamsD
-
-            if self.hyperParameterTuning.exhaustiveTuning.apply:
-
-                # Set the results from the hyperParameter Tuning
-                resultD['hyperParameterTuning']['exhaustiveTuning'] = self.tunedHyperParamsD
-
-        # Add the finally selected bands
-
-        resultD['appliedModelingFeatures'] = self.finalFeatureLD
-
-        # Add the final model results
-        if self.modelTests.apply:
-
-            resultD['modelResults'] = {}
-
-            if self.modelTests.trainTest.apply:
-
-                resultD['modelResults']['trainTest'] = self.trainTestResultD
-
-            if self.modelTests.Kfold.apply:
-
-                resultD['modelResults']['Kfold'] = self.KfoldResultD
-
-        #pp = pprint.PrettyPrinter(indent=2)
-        #pp.pprint(resultD)
-
-        jsonF = open(self.regrJsonFPN, "w")
-
-        json.dump(resultD, jsonF, indent = 2)
-
-        jsonF = open(self.paramJsonFPN, "w")
-
-        json.dump(self.paramD, jsonF, indent = 2)
-
-    def _PlotTitleTextn(self, titleSuffix,plotskipstep):
-        ''' Set plot title and annotation
-
-            :param str titleSuffix: amendment to title
-
-            :returns: x-axis label
-            :rtype: str
-
-            :returns: y-axis label
-            :rtype: str
-
-            :returns: title
-            :rtype: str
-
-            :returns: text
-            :rtype: str
+            :param rowL: array of data
+            :rtype: list of list
         '''
 
-        # Set title
-        title = self.name
+        metadataItemL = ['id.layer_local_c', 'dataset.code_ascii_txt',
+                         'id.layer_uuid_txt', 'longitude.point_wgs84_dd',
+                         'latitude.point_wgs84_dd', 'layer.sequence_usda_uint16',
+                         'layer.upper.depth_usda_cm', 'layer.lower.depth_usda_cm',
+                         'observation.date.begin_iso.8601_yyyy.mm.dd', 'observation.date.end_iso.8601_yyyy.mm.dd',
+                         'surveyor.title_utf8_txt', 'id.project_ascii_txt',
+                         'id.location_olc_txt', 'layer.texture_usda_txt',
+                         'pedon.taxa_usda_txt', 'horizon.designation_usda_txt',
+                         'longitude.county_wgs84_dd', 'latitude.county_wgs84_dd',
+                         'location.point.error_any_m', 'location.country_iso.3166_txt',
+                         'observation.ogc.schema.title_ogc_txt', 'observation.ogc.schema_idn_url',
+                         'surveyor.contact_ietf_email', 'surveyor.address_utf8_txt',
+                         'dataset.title_utf8_txt', 'dataset.owner_utf8_txt',
+                         'dataset.address_idn_url', 'dataset.doi_idf_url',
+                         'dataset.license.title_ascii_txt', 'dataset.license.address_idn_url',
+                         'dataset.contact.name_utf8_txt', 'dataset.contact_ietf_email',
+                         'id.dataset.site_ascii_txt', 'id_mir', 'id_vis', 'id_neon']
 
-        # set the text
-        text = self.plot.text.text
+        metadataColumnL = []
 
-        # Add the bandwidth
-        if self.plot.text.bandwidth:
+        for item in metadataItemL:
 
-            bandwidth = (max(self.columns)- min(self.columns))/(len(self.columns)-1)
+            metadataColumnL.append(metadataItemL.index(item))
 
-            text += '\nbandwidth=%s nm' %( bandwidth )
+        self.SitemetatadaItemD = dict(zip(metadataItemL,metadataColumnL))
 
-        # Add number of samples to text
-        if self.plot.text.samples:
+        self.siteD = {}
 
-            text += '\nnspectra=%s; nbands=%s' %( self.spectraDF.shape[0],len(self.columns))
-            text += '\nshowing every %s spectra' %( plotskipstep )
+        self.minLat = 90; self.maxLat = -90; self.minLon = 180; self.maxLon = -180
 
-        yLabel = self.plot.rawaxislabel.x
+        for row in rowL:
 
-        xLabel = self.plot.rawaxislabel.y
+            #self.siteD[ row[1] ] = {}
+            self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ] = {}
 
-        return (xLabel, yLabel, title, text)
+            for item in self.sitedata:
 
-    def _PilotModeling(self,rootFP,sourcedatafolder,dstRootFP):
-        ''' Steer the sequence of processes for modeling spectra data in json format
-        '''
+                colNr = headers.index(item)
 
-        if len(self.targetFeatures) == 0:
+                self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ][item] = row[colNr]
 
-            exit('Exiting - you have to set at least 1 target feature')
+            # Check if site is inside depth limits
+            if float(self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ]["layer.upper.depth_usda_cm"]) < self.soilSample.minDepth  or float(self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ]["layer.lower.depth_usda_cm"]) > self.soilSample.maxDepth:
 
-        if len(self.regressorModels) == 0:
+                self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ]["id_vis"] = "FALSE"
 
-            exit('Exiting - you have to set at least 1 regressor')
-            
-        # Set the source file names
-        self._SetSrcFPNs(rootFP, dstRootFP, sourcedatafolder)
-        
-        # set the destination file names
-        self._SetDstFPNs()
+                self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ]["id_mir"] = "FALSE"
 
-        # Get the band data as self.spectraDF
-        self._GetBandData()
-
-        # Get and add the abundance data
-        self._GetAbundanceData()
-
-        self.hyperParamtxt = "hyper-param tuning: None"
-
-        if self.hyperParameterTuning.apply:
-
-            if self.hyperParameterTuning.exhaustiveTuning.apply:
-
-                hyperParameterTuning = 'ExhaustiveTuning'
-
-                self.tuningParamD = ReadModelJson(self.input.hyperParameterExhaustiveTuning)
-
-                self.hyperParamtxt = "hyper-param tuning: grid search"
-
-            elif self.hyperParameterTuning.randomTuning.apply:
-
-                hyperParameterTuning = 'RandomTuning'
-
-                self.tuningParamD = ReadModelJson(self.input.hyperParameterRandomTuning)
-
-                self.hyperParamtxt = "hyper-param tuning: random"
+                self.siteD[ row[self.SitemetatadaItemD['id.layer_uuid_txt']] ]["id_neon"] = "FALSE"
 
             else:
 
-                errorStr = 'Hyper parameter tuning requested, but no method assigned'
+                if float(row[self.SitemetatadaItemD['latitude.point_wgs84_dd']] ) < self.minLat:
 
-                exit(errorStr)
+                    self.minLat =  float(row[self.SitemetatadaItemD['latitude.point_wgs84_dd']] )
 
-            self.hyperParams = Obj(self.tuningParamD )
+                elif float(row[self.SitemetatadaItemD['latitude.point_wgs84_dd']] ) > self.maxLat:
 
-        # Set the dictionaries to hold the model results
-        self.trainTestResultD = {}; self.KfoldResultD  = {}; self.tunedHyperParamsD = {}
-        self.globalFeatureSelectedD = {}; self.outliersRemovedD = {};
-        self.agglomeratedFeaturesD = {}; self.targetFeatureSelectedD = {}
-        self.modelFeatureSelectedD = {}; self.modelFeatureImportanceD = {}
-        self.finalFeatureLD = {}
+                    self.maxLat =  float(row[self.SitemetatadaItemD['latitude.point_wgs84_dd']] )
 
-        # Create the subDicts for all model + target related presults
-        for targetFeature in self.targetFeatures:
+                if float(row[self.SitemetatadaItemD['longitude.point_wgs84_dd']] ) < self.minLon:
 
-            self.tunedHyperParamsD[targetFeature] = {}; self.trainTestResultD[targetFeature] = {}
-            self.KfoldResultD[targetFeature] = {}; self.modelFeatureSelectedD[targetFeature] = {}
-            self.targetFeatureSelectedD[targetFeature] = {}; self.modelFeatureImportanceD[targetFeature] = {}
-            self.finalFeatureLD[targetFeature] = {}
+                    self.minLon =  float(row[self.SitemetatadaItemD['longitude.point_wgs84_dd']] )
 
-            for regModel in self.jsonparamsD['regressionModels']:
+                elif float(row[self.SitemetatadaItemD['longitude.point_wgs84_dd']] ) > self.maxLon:
 
-                if self.paramD['regressionModels'][regModel]['apply']:
+                    self.maxLon =  float(row[self.SitemetatadaItemD['longitude.point_wgs84_dd']] )
 
-                    self.trainTestResultD[targetFeature][regModel] = {}
-                    self.KfoldResultD[targetFeature][regModel] = {}
-                    self.modelFeatureSelectedD[targetFeature][regModel] = {}
-                    self.modelFeatureImportanceD[targetFeature][regModel] = {}
-                    self.finalFeatureLD[targetFeature][regModel] = {}
+    def _ExtractLabData(self, headers, rowL):
+        ''' Extract the key lab data required (ossl file: "soillab.data.csv")
 
-                    if self.paramD['hyperParameterTuning']['apply'] and self.tuningParamD[hyperParameterTuning][regModel]['apply']:
+            :paramn headers: list of columns
+            :type: list
 
-                        self.tunedHyperParamsD[targetFeature][regModel] = {}
+            :param rowL: array of data
+            :rtype: list of list
+        '''
 
-        # RemoveOutliers is applied to the full dataset and affects all models
-        if self.removeOutliers.apply:
+        metadataItemL = ['id.layer_local_c','dataset.code_ascii_txt','id.layer_uuid_txt']
 
-            self._RemoveOutliers()
+        metadataColumnL = []
 
-        # Any manual feature selection is applied to the original dataframe - i.e. affect all models the same
-        if self.manualFeatureSelection.apply:
+        for item in metadataItemL:
 
-            self._ManualFeatureSelector()
+            metadataColumnL.append(metadataItemL.index(item))
 
-        # The feature selection is applied to the original dataframe - i.e. affect all models the same
-        if self.globalFeatureSelection.apply:
+        self.LabmetatadaItemD = dict(zip(metadataItemL,metadataColumnL))
 
-            self._VarianceSelector()
+        self.labD = {}
 
-        # Set the subplot
-        self._SetSubPlots()
+        for row in rowL:
 
-        # Loop over the target features to model
-        for self.targetN, self.targetFeature in enumerate(self.targetFeatures):
+            self.labD[ row[self.LabmetatadaItemD['id.layer_uuid_txt'] ] ] = []
 
-            if self.verbose:
+            skip = False
 
-                infoStr = '\n            Target feature: %s' %(self.targetFeature)
+            for item in self.params.labData:
 
-                print (infoStr)
+                colNr = headers.index(item)
 
-            self._ExtractDataFrame()
+                #if item in self.params.labDataRange:
+                if hasattr(self.params, 'labDataRange'):
 
-            self._SetTargetFeatureSymbol()
+                    if hasattr(self.params.labDataRange,item):
 
-            if self.targetFeatureSelection.apply:
+                        if row[colNr] != 'NA':
 
-                if self.targetFeatureSelection.univariateSelection.apply:
+                            itemRange = getattr(self.params.labDataRange,item)
 
-                    self._UnivariateSelector()
+                            if float(row[colNr]) < itemRange.min or float(row[colNr]) > itemRange.max:
 
-            # Covariate (X) Agglomeration
-            if self.featureAgglomeration.apply:
+                                skip = True
 
-                if self.featureAgglomeration.wardClustering.apply:
+            # Loop again, only accept items that are not skipped
+            for item in self.params.labData:
 
-                    if self.featureAgglomeration.wardClustering.tuneWardClustering.apply:
+                colNr = headers.index(item)
 
-                        n_clusters = self._TuneWardClustering()
+                if not skip:
 
-                    else:
+                    try:
 
-                        n_clusters = self.featureAgglomeration.wardClustering.n_clusters
+                        # Only if a numerical value is given
+                        self.labD[ row[self.LabmetatadaItemD['id.layer_uuid_txt']] ].append( {'substance': item, 'value':float(row[colNr]) } )
 
-                    self._WardClustering(n_clusters)
-            # End of target feature related selection and clustering
+                    except:
 
-            #Loop over the defined models
-            for self.regrN, self.regrModel in enumerate(self.regressorModels):
+                        # Otherwise skip this lab parameter for this site
+                        pass
 
-                if  self.modelFeatureSelection.apply:
+    def _ExtractNEONLabData(self, headers, rowL):
+        ''' Extract the key lab data required (ossl file: "soillab.data.csv") for NEON (lacks uuid)
 
-                    if self.modelFeatureSelection.permutationSelector.apply:
+            :paramn headers: list of columns
+            :type: list
 
-                        self._PermutationSelector()
+            :param rowL: array of data
+            :rtype: list of list
+        '''
 
-                    elif self.modelFeatureSelection.RFE.apply:
+        metadataItemL = ['id.layer_local_c','dataset.code_ascii_txt','id.layer_uuid_txt']
 
-                        if self.regrModel[0] in ['KnnRegr','MLP']:
+        metadataColumnL = []
 
-                            self._PermutationSelector()
+        for item in metadataItemL:
 
-                        else:
+            metadataColumnL.append(metadataItemL.index(item))
 
-                            self._RFESelector()
+        self.NeonLabmetatadaItemD = dict(zip(metadataItemL,metadataColumnL))
 
-                if self.featureImportance.apply:
+        self.labD = {}
 
-                    self._FeatureImportance()
+        for row in rowL:
 
-                if self.hyperParameterTuning.apply:
+            self.labD[ row[self.LabmetatadaItemD['id.layer_local_c'] ] ] = []
 
-                    if self.hyperParameterTuning.exhaustiveTuning.apply:
+            skip = False
 
-                        self._ExhaustiveTuning()
+            for item in self.params.labData:
 
-                    elif self.hyperParameterTuning.randomTuning.apply:
+                colNr = headers.index(item)
 
-                        self._RandomTuning()
+                #if item in self.params.labDataRange:
+                if hasattr(self.params.labDataRange,item):
 
-                    # Reset the regressor with the optimized hyperparameter tuning
+                    if row[colNr] != 'NA':
 
-                    # Set the regressor models to apply
-                    self._RegModelSelectSet()
+                        itemRange = getattr(self.params.labDataRange,item)
 
-                if self.verbose > 1:
+                        if float(row[colNr]) < itemRange.min or float(row[colNr]) > itemRange.max:
 
-                    # Report the regressor model settings (hyper parameters)
-                    self._ReportRegModelParams()
+                            skip = True
 
-                self.finalFeatureLD[self.targetFeature][self.regrModel[0]] = self.columns.tolist()
+            # Loop again, only accept items that are not skipped
+            for item in self.params.labData:
 
-                if self.modelTests.apply:
+                colNr = headers.index(item)
 
-                    if self.modelTests.trainTest.apply:
+                if not skip:
 
-                        self._RegrModTrainTest()
+                    try:
 
-                    if self.modelTests.Kfold.apply:
+                        # Only if a numerical value is given
+                        self.labD[ row[self.LabmetatadaItemD['id.layer_local_c']] ].append( {'substance': item, 'value':float(row[colNr]) } )
 
-                        self._RegrModKFold()
+                    except:
 
-        plt.show()
+                        # Otherwise skip this lab parameter for this site
+                        pass
 
-        if self.plot.rows.savePng:
+    def _AverageSpectra(self, spectrA, inputBeginWaveLength, inputEndWaveLength, inputBandWidth, outputBeginWaveLength, outputEndWaveLength, outputBandWidth):
+        ''' Average high resolution spectral signals to broader bands
 
-            if self.plot.rows.targetFeatures.apply:
+            :paramn spectrA: array of spectral signsals
+            :type: np array
 
-                for regModel in self.paramD['regressionModels']:
+            :param inputBeginWaveLength: first wavelength (nm) of spectrA
+            :rtype: float
 
-                    if self.paramD['regressionModels'][regModel]['apply']:
+            :param inputEndWaveLength: last wavelength (nm) of spectrA
+            :rtype: float
 
-                        self.columnFig[regModel].savefig(self.imageFPND[regModel]['alltargets'])
+            :param inputBandWidth: the spectral resolution (nm) of spectrA
+            :rtype: float
 
-            if self.plot.rows.regressionModels.apply:
+            :param outputBeginWaveLength: first wavelength (nm) of the output spectra
+            :rtype: float
 
-                for targetFeature in self.targetFeatures:
+            :param outputEndWaveLength: last wavelength (nm) of the output spectra
+            :rtype: float
 
-                    self.columnFig[targetFeature].savefig(self.imageFPND[targetFeature]['allmodels'])
+            :param outputBandWidth: the spectral resolution (nm) of the output spectra
+            :rtype: float
+        '''
+        halfwlstep = outputBandWidth/2
 
+        inputWls = np.arange(inputBeginWaveLength, inputEndWaveLength+1, inputBandWidth)
 
-        print (self.imageFPND[targetFeature]['allmodels'])
+        outputWls = np.arange(outputBeginWaveLength, outputEndWaveLength+1, outputBandWidth)
 
-        self._DumpJson()
+        meanSpectra = np.interp(outputWls, inputWls, spectrA,
+                                   left=outputBeginWaveLength-halfwlstep,
+                                   right=outputEndWaveLength+halfwlstep)
+
+        return outputWls, meanSpectra
+
+    def _ExtractVISNIRSpectraData(self, headers, rowL):
+        ''' Extract VISNIR spectra from OSSL csv (ossl file: "visnir.data.csv")
+
+            :paramn headers: list of columns
+            :type: list
+
+            :param rowL: array of data
+            :rtype: list of list
+        '''
+
+        # The list of metadata items must be a complete list of the headers initial metadata
+        metadataItemL = ['id.layer_local_c','dataset.code_ascii_txt',
+                         'id.layer_uuid_txt','id.scan_local_c',
+                         'scan.visnir.date.begin_iso.8601_yyyy.mm.dd',
+                         'scan.visnir.date.end_iso.8601_yyyy.mm.dd',
+                         'scan.visnir.model.name_utf8_txt',
+                         'scan.visnir.model.code_any_txt',
+                         'scan.visnir.method.optics_any_txt',
+                         'scan.visnir.method.preparation_any_txt',
+                         'scan.visnir.license.title_ascii_txt',
+                         'scan.visnir.license.address_idn_url',
+                         'scan.visnir.doi_idf_url','scan.visnir.contact.name_utf8_txt',
+                         'scan.visnir.contact.email_ietf_txt']
+
+
+        metadataColumnL = []
+
+        for item in metadataItemL:
+
+            metadataColumnL.append(metadataItemL.index(item))
+
+        self.VISNIRmetatadaItemD = dict(zip(metadataItemL,metadataColumnL))
+
+        self.VISNIRspectraD = {};  self.VISNIRmetaD = {}
+
+        mincoltest = int( len(metadataItemL)+(self.params.visnir.beginWaveLength-350)/2 )
+
+        mincol = int( len(metadataItemL) )
+
+        maxcoltest = int( len(headers)-(2500-self.params.visnir.endWaveLength)/2 )
+
+        maxcol = int( len(headers) )
+
+        for row in rowL:
+
+            if self.siteD[ row[self.VISNIRmetatadaItemD['id.layer_uuid_txt']] ]['id_vis'] == 'TRUE':
+
+                if 'NA' in row[mincoltest:maxcoltest]:
+
+                    self.siteD[ row[self.VISNIRmetatadaItemD['id.layer_uuid_txt']] ]['id_vis'] = 'FALSE'
+
+                    print ('WARING The requested wavelength range contains NoData')
+
+                    continue
+
+                row = [0 if i == 'NA' else i for i in row]
+
+                visnirSpectrA = np.asarray(row[mincol:maxcol]).astype(float)
+
+                self.outputWls, spectraA = self._AverageSpectra(visnirSpectrA, 350, 2500, 2, self.params.visnir.beginWaveLength, self.params.visnir.endWaveLength, self.params.visnir.outputBandWidth)
+
+                spectraA = np.round(spectraA, 4)
+
+                self.VISNIRmetaD[ row[self.VISNIRmetatadaItemD['id.layer_uuid_txt']] ] = {'scandatebegin': row[self.VISNIRmetatadaItemD['scan.visnir.date.begin_iso.8601_yyyy.mm.dd']] ,
+                                    'scandateend': row[self.VISNIRmetatadaItemD['scan.visnir.date.end_iso.8601_yyyy.mm.dd']] ,
+                                    'sampleprep': row[self.VISNIRmetatadaItemD['scan.visnir.method.preparation_any_txt']],
+                                    'instrument': row[self.VISNIRmetatadaItemD['scan.visnir.model.name_utf8_txt']]}
+
+                self.VISNIRspectraD[ row[self.VISNIRmetatadaItemD['id.layer_uuid_txt']] ] = spectraA
+
+                self.VISNIRnumberOfwl = spectraA.shape[0]
+
+    def _ExtractNEONpectraData(self, headers, rowL):
+        ''' Extract NEON (NeoSpectra) NIR spectra from OSSL csv (ossl file: "neon.data.csv")
+
+            :paramn headers: list of columns
+            :type: list
+
+            :param rowL: array of data
+            :rtype: list of list
+        '''
+
+        # The list of metadata items must be a complete list of the headers initial metadata
+        metadataItemL = ['id.layer_local_c','id.scan_local_c',
+                         'scan.lab_utf8_txt','scan.nir.date.begin_iso.8601_yyyy.mm.dd',
+                         'scan.nir.date.end_iso.8601_yyyy.mm.dd','scan.nir.model.name_utf8_txt',
+                         'scan.nir.model.serialnumber_utf8_int','scan.nir.accessory.used_utf8_txt'
+                         ,'scan.nir.method.preparation_any_txt','scan.nir.license.title_ascii_txt',
+                         'scan.nir.license.address_idn_url','scan.nir.doi_idf_url',
+                         'scan.nir.contact.name_utf8_txt','scan.nir.contact.email_ietf_txt']
+
+        metadataColumnL = []
+
+        for item in metadataItemL:
+
+            metadataColumnL.append(metadataItemL.index(item))
+
+        self.NEONmetatadaItemD = dict(zip(metadataItemL,metadataColumnL))
+
+        self.NEONspectraD = {}
+
+        mincol = int( len(metadataItemL)+(self.params.visnirBegin-1350)/2 )
+
+        maxcol = int( len(headers)-1-(2550-self.params.visnirEnd)/2 )
+
+        for row in rowL:
+
+            if self.siteD[ row[self.NEONmetatadaItemD['id.layer_local_c']] ]['id_neon'] == 'TRUE':
+
+                if 'NA' in row[mincol:maxcol]:
+
+                    self.siteD[ row[self.NEONmetatadaItemD['id.layer_local_c']] ]['id_neon'] = 'FALSE'
+
+                    continue
+
+                visnirSpectrA = np.asarray(row[mincol:maxcol]).astype(float)
+
+                spectraA = self._AverageSpectra(visnirSpectrA, self.params.visnirStep)
+
+                self.NEONspectraD[ row[self.NEONmetatadaItemD['id.layer_local_c']] ] = spectraA
+
+                self.NEONnumberOfwl = spectraA.shape[0]
+
+    def _SetProjectJson(self,modname):
+        '''
+        '''
+        projectid = '%s_%s_%s' %(self.params.campaign.geoRegion, modname, Today())
+
+        projectname = '%s_%s' %(self.params.campaign.geoRegion, modname)
+
+        projectD = {'id': projectid, 'name':projectname, 'userId': self.params.userId,
+                    'importVersion': self.params.importVersion}
+
+        return projectD
+
+    def _SetCampaignD(self, modname):
+        ''' Set parameters defining the campaign
+        '''
+
+        campaignD = {'campaignId': modname,
+                     'campaignShortId': self.params.campaign.campaignShortId,
+                     'campaignType':self.params.campaign.campaignType,
+                     'theme': self.params.campaign.theme,
+                     'product':self.params.campaign.product,
+                     'geoRegion':self.params.campaign.geoRegion,
+                     'minLat':self.minLat,
+                     'maxLat':self.maxLat,
+                     'minLon':self.minLon,
+                     'maxLon':self.maxLon,
+                     }
+
+        return campaignD
+
+    def _ReportSiteMeta(self,site):
+        """
+        """
+
+        metaD = {'siteLocalId': self.siteD[site]['id.layer_local_c']}
+
+        metaD['dataset'] = self.siteD[site]['dataset.code_ascii_txt']
+
+        ''' Latitude and Longitude id changed in online OSSL'''
+        #jsonD['latitude_dd'] = self.siteD[site]['latitude_wgs84_dd']
+        metaD['latitude_dd'] = self.siteD[site]['latitude.point_wgs84_dd']
+
+        #jsonD['longitude_dd'] = self.siteD[site]['latitude_wgs84_dd']
+        metaD['longitude_dd'] = self.siteD[site]['longitude.point_wgs84_dd']
+
+        metaD['minDepth'] = self.siteD[site]['layer.upper.depth_usda_cm']
+
+        metaD['maxDepth'] = self.siteD[site]['layer.lower.depth_usda_cm']
+
+        return (metaD)
+
+    def _AssembleVISNIRJsonD(self):
+        """ Convert the extracted data to json objects for export
+        """
+
+        projectD = self._SetProjectJson(self.visnirModelN)
+
+        projectD['campaign'] = self._SetCampaignD(self.visnirModelN)
+
+
+        projectD['waveLength'] = self.outputWls.tolist()
+
+        varLD = []
+
+        for site in self.siteD:
+
+            if self.siteD[site]['id_vis'] == 'TRUE':
+
+                metaD = self._ReportSiteMeta(site)
+
+                jsonD = {'id':site, 'meta' : metaD}
+
+                # Add the VISNIR scan specific metadata for this layer
+                for key in self.VISNIRmetaD[ site]:
+
+                    metaD[key] = self.VISNIRmetaD[site][key]
+
+                # Add the VISNIR spectral signal
+                jsonD['signalMean'] = self.VISNIRspectraD[site].tolist()
+
+                jsonD['abundances'] = self.labD[site]
+
+                varLD.append(jsonD)
+
+        projectD['spectra'] = varLD
+
+        # export, or dump, the assembled json objects
+        self._DumpSpectraJson(projectD, self.visnirDataFPN, self.visnirParamFPN , "VISNIR")
+
+
+    def _AssembleNEONJsonD(self, arrangeddatafolder):
+        ''' Convert the extracted data to json objects for export
+        '''
+
+        modname = '%s_%s-%s_%s' %(os.path.split(self.params.rootFP)[1],
+                    self.params.neonBegin,self.params.neonEnd,int(self.params.neonStep*2))
+
+        exportD = self._SetReportJson(modname)
+
+        exportD['campaign'] = self._SetCampaignD(modname)
+
+        if self.params.neonStep == 1:
+
+            wl = [i for i in range(self.params.neonBegin, self.params.neonEnd+1, self.params.neonStep*2)]
+
+        else:
+
+            wl = [i+self.params.neonStep for i in range(self.params.neonBegin, self.params.neonEnd, self.params.neonStep*2)]
+
+        # Reduce wl if bands are cut short while averaging
+        wl = wl[0:self.neonnumberOfwl]
+
+        exportD['wavelength'] = wl
+
+        varLD = []
+
+        for site in self.siteD:
+
+            if self.siteD[site]['id_vis'] == 'TRUE':
+
+                jsonD = {'uuid':site}
+
+                ''' Latitude and Longitude id changed in online OSSL'''
+                #jsonD['latitude_dd'] = self.siteD[site]['latitude_wgs84_dd']
+                jsonD['latitude_dd'] = self.siteD[site]['latitude.point_wgs84_dd']
+
+                #jsonD['longitude_dd'] = self.siteD[site]['latitude_wgs84_dd']
+                jsonD['longitude_dd'] = self.siteD[site]['longitude.point_wgs84_dd']
+
+                jsonD['mindepth'] = self.siteD[site]['layer.upper.depth_usda_cm']
+
+                jsonD['maxdepth'] = self.siteD[site]['layer.lower.depth_usda_cm']
+
+                jsonD['samplemean'] = self.neonspectraD[site].tolist()
+
+                jsonD['abundance'] = self.labD[site]
+
+                varLD.append(jsonD)
+
+        exportD['labspectra'] = varLD
+
+        # export, or dump, the assembled json objects
+        self._DumpNEONJson(exportD)
+
+    def _PilotImport(self, rootFP, sourcedatafolder, dstRootFP):
+        ''' Steer the sequence of processes for extracting OSSL csv data to json objects
+        '''
+
+        # Set the source file names
+        self._SetSrcFPNs(rootFP, sourcedatafolder)
+
+        self._SetProjectNameId()
+
+        # REad the site data
+        headers, rowL = ReadCSV(self.srcSoilSiteFPN)
+
+        # Extract the site data
+        self._ExtractSiteData(headers, rowL)
+
+        # Read the laboratory (wet chemistry) data
+        headers, rowL = ReadCSV(self.srcSoilLabFPN)
+
+        # Extract the laboratory (wet chemistry) data
+        self._ExtractLabData(headers, rowL)
+
+        if self.params.visnir.apply:
+
+            # Set the sdestination file names - must be done after _ExtractVISNIRSpectraData
+            self.visnirModelN, self.visnirParamFPN, self.visnirDataFPN, self.visnirColumnStep, self.visnirWlStep = self._SetDstFPN(dstRootFP,'visnir',self.visnir.subFP)
+
+            headers, rowL = ReadCSV(self.srcVISNIRFPN)
+
+            self._ExtractVISNIRSpectraData(headers, rowL)
+
+            self._AssembleVISNIRJsonD()
+
+        if self.params.neon.apply:
+
+            headers, rowL = ReadCSV(self.srcNEONFPN)
+
+            self._ExtractNEONSpectraData(headers, rowL)
+
+            self._AssembleNEONJsonD()
+
+        if self.params.mir.apply:
+
+            headers, rowL = ReadCSV(self.srcMIRFPN)
+
+            self._ExtractMIRSpectraData(headers, rowL)
+
+            self._AssembleNEONJsonD()
 
 def SetupProcesses(iniParams):
     '''Setup and loop processes
@@ -3266,50 +1385,44 @@ def SetupProcesses(iniParams):
     :param projFN: project filename (in destination folder)
     :type: str
 
-    :param jsonpath: folder name
+    :param jsonfolder: folder name
     :type: str
 
     '''
 
     dstRootFP, jsonFP = CheckMakeDocPaths(iniParams['rootpath'],
                                           iniParams['arrangeddatafolder'],
-                                          iniParams['jsonpath'],
+                                          iniParams['jsonfolder'],
                                           iniParams['sourcedatafolder'])
-
+    
+    print (jsonFP)
+    
     if iniParams['createjsonparams']:
 
-        CreateArrangeParamJson(jsonFP,iniParams['projFN'],'mlmodel')
+        CreateArrangeParamJson(jsonFP,iniParams['projFN'],'import')
 
-    jsonProcessObjectL = ReadProjectFile(dstRootFP, iniParams['projFN'], jsonFP)
+    jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
 
-    # Get the target Feature Symbols
-    targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
-        
-    #Loop over all json files
+    #Loop over all json files and create Schemas and Tables
     for jsonObj in jsonProcessObjectL:
 
         print ('    jsonObj:', jsonObj)
 
-        paramD = ReadModelJson(jsonObj)
+        paramD = ReadImportParamsJson(jsonObj)
+
+
+        '''
+        pp = pprint.PrettyPrinter(indent=2)
+
+        pp.pprint(paramD)
+        '''
         
-        # Add the targetFeatureSymbols
-        paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
+        # Invoke the import
+        ossl = ImportOSSL(paramD)
 
-        # Invoke the modeling
-        mlModel = MachineLearningModel(paramD)
+        ossl._PilotImport(iniParams['rootpath'], iniParams['sourcedatafolder'],  dstRootFP)
 
-        mlModel.paramD = paramD
-
-        # Add the raw paramD as a variable to mlModel
-        mlModel.jsonparamsD = paramD
-
-        # Set the regressor models to apply
-        mlModel._RegModelSelectSet()
-
-        # run the modeling
-        mlModel._PilotModeling(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     ''' If script is run as stand alone
     '''
 
@@ -3318,19 +1431,17 @@ if __name__ == '__main__':
 
         sys.exit('Give the link to the json file to run the process as the only argument')
 
-    #Get the json file
+    #Get the root json file
     rootJsonFPN = sys.argv[1]
 
-    if not os.path.exists(jsonFPN):
+    if not os.path.exists(rootJsonFPN):
 
         exitstr = 'json file not found: %s' %(rootJsonFPN)
 
     
-    rootJsonFPN = "/Local/path/to/model_ossl.json"
+    rootJsonFPN = "/Local/path/to/import_ossl.json"
     '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/model_ossl.json"
-    
-
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/import_ossl.json"
     iniParams = ReadAnyJson(rootJsonFPN)
 
     SetupProcesses(iniParams)
