@@ -764,8 +764,7 @@ class ImportOSSL(Obj):
 
             os.makedirs(FP)
 
-        modelN = '%s_%s-%s_%s' %(os.path.split(self.params.rootFP)[1],
-                        beginWaveLength, endWaveLength, wlStep)
+        modelN = '%s-%s_%s' %(beginWaveLength, endWaveLength, wlStep)
 
         paramFN = 'params-%s_%s.json' %(band, modelN)
 
