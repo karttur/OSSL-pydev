@@ -107,6 +107,12 @@ def ReadCSV(FPN):
     '''
 
     rowL = []
+    
+    if not os.path.exists(FPN):
+        
+        exitStr = 'File does not exist: %s' %(FPN)
+        
+        exit(exitStr )
 
     with open( FPN, 'r' ) as csvF:
 
@@ -515,7 +521,7 @@ def ReadImportParamsJson(jsonFPN):
 
     return ReadAnyJson(jsonFPN)
 
-def ReadProjectFile(dstRootFP,projFN, jsonFP):
+def ReadProjectFile(rootFP, dstRootFP,projFN, jsonFP):
     """ Read the project file (txt file)
 
         :param str dstRootFP: destination root directory path
@@ -526,7 +532,7 @@ def ReadProjectFile(dstRootFP,projFN, jsonFP):
     """
 
     projFPN = os.path.join(dstRootFP,projFN)
-
+    
     if not os.path.exists(projFPN):
 
         exitstr = 'EXITING, project file missing: %s.' %(projFPN)
@@ -541,7 +547,7 @@ def ReadProjectFile(dstRootFP,projFN, jsonFP):
     with open(projFPN) as f:
 
         jsonL = f.readlines()
-
+  
     # Clean the list of json objects from comments and whithespace etc
     jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonL if len(x) > 10 and x[0] != '#']
 
@@ -677,21 +683,36 @@ class ImportOSSL(Obj):
         # Deep copy parameters to a new obejct class called params
         self.params = deepcopy(self)
 
-    def _SetSrcFPNs(self, sourcedatafolder):
+    def _SetSrcFPNs(self, rootFP, sourcedatafolder):
         ''' Set source file paths and names
         '''
 
         # All OSSL data are download as a zipped subfolder with data given standard names as of below
-        self.srcVISNIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'visnir.data.csv')
+               
+        # if the path to rootFP is set to a dot '.' (= self) then use the default rootFP 
+        if self.params.rootFP == '.':
+            
+            self.srcSoilSiteFPN = os.path.join(rootFP,sourcedatafolder,'soilsite.data.csv')
+        
+            self.srcVISNIRFPN = os.path.join(rootFP,sourcedatafolder,'visnir.data.csv')
 
-        self.srcMIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'mir.data.csv')
+            self.srcMIRFPN = os.path.join(rootFP,sourcedatafolder,'mir.data.csv')
+    
+            self.srcNEONFPN = os.path.join(rootFP,sourcedatafolder,'neon.data.csv')
+    
+            self.srcSoilLabFPN = os.path.join(rootFP,sourcedatafolder,'soillab.data.csv')
 
-        self.srcNEONFPN = os.path.join(self.params.rootFP,sourcedatafolder,'neon.data.csv')
+        else:
+        
+            self.srcSoilSiteFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soilsite.data.csv')
+        
+            self.srcVISNIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'visnir.data.csv')
 
-        self.srcSoilLabFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soillab.data.csv')
-
-        self.srcSoilSiteFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soilsite.data.csv')
-
+            self.srcMIRFPN = os.path.join(self.params.rootFP,sourcedatafolder,'mir.data.csv')
+    
+            self.srcNEONFPN = os.path.join(self.params.rootFP,sourcedatafolder,'neon.data.csv')
+    
+            self.srcSoilLabFPN = os.path.join(self.params.rootFP,sourcedatafolder,'soillab.data.csv')
 
     def _SetProjectNameId(self):
         ''' Set project name and id if they are not user defined
@@ -1299,12 +1320,12 @@ class ImportOSSL(Obj):
         # export, or dump, the assembled json objects
         self._DumpNEONJson(exportD)
 
-    def _PilotImport(self,sourcedatafolder, dstRootFP):
+    def _PilotImport(self, rootFP, sourcedatafolder, dstRootFP):
         ''' Steer the sequence of processes for extracting OSSL csv data to json objects
         '''
 
         # Set the source file names
-        self._SetSrcFPNs(sourcedatafolder)
+        self._SetSrcFPNs(rootFP, sourcedatafolder)
 
         self._SetProjectNameId()
 
@@ -1371,12 +1392,14 @@ def SetupProcesses(iniParams):
                                           iniParams['arrangeddatafolder'],
                                           iniParams['jsonfolder'],
                                           iniParams['sourcedatafolder'])
-
+    
+    print (jsonFP)
+    
     if iniParams['createjsonparams']:
 
         CreateArrangeParamJson(jsonFP,iniParams['projFN'],'import')
 
-    jsonProcessObjectL = ReadProjectFile(dstRootFP, iniParams['projFN'], jsonFP)
+    jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
 
     #Loop over all json files and create Schemas and Tables
     for jsonObj in jsonProcessObjectL:
@@ -1391,32 +1414,32 @@ def SetupProcesses(iniParams):
 
         pp.pprint(paramD)
         '''
-
+        
         # Invoke the import
         ossl = ImportOSSL(paramD)
 
-        ossl._PilotImport(iniParams['sourcedatafolder'], dstRootFP)
+        ossl._PilotImport(iniParams['rootpath'], iniParams['sourcedatafolder'],  dstRootFP)
 
 if __name__ == "__main__":
     ''' If script is run as stand alone
     '''
 
-
+    '''
     if len(sys.argv) != 2:
 
         sys.exit('Give the link to the json file to run the process as the only argument')
 
-    #Get the json file
-    jsonFPN = sys.argv[1]
+    #Get the root json file
+    rootJsonFPN = sys.argv[1]
 
-    if not os.path.exists(jsonFPN):
+    if not os.path.exists(rootJsonFPN):
 
-        exitstr = 'json file not found: %s' %(jsonFPN)
+        exitstr = 'json file not found: %s' %(rootJsonFPN)
 
+    
+    rootJsonFPN = "/Local/path/to/import_ossl.json"
     '''
-    jsonFPN = "/Local/path/to/import_ossl.json"
-    '''
-
-    iniParams = ReadAnyJson(jsonFPN)
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/import_ossl.json"
+    iniParams = ReadAnyJson(rootJsonFPN)
 
     SetupProcesses(iniParams)

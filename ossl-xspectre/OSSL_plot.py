@@ -381,7 +381,7 @@ def ReadImportParamsJson(jsonFPN):
 
     return ReadAnyJson(jsonFPN)
 
-def ReadProjectFile(dstRootFP,projFN, jsonFP):
+def ReadProjectFile(rootFP, dstRootFP,projFN, jsonFP):
     '''
     '''
     projFPN = os.path.join(dstRootFP,projFN)
@@ -622,14 +622,67 @@ class SpectraPlot(Obj):
 
         # Deep copy the parameters to self.spectraPlotD
         self.spectraPlotD = deepcopy(paramD)
+        
+    
+    def _SetSrcFPNs(self, rootFP, dstRootFP, sourcedatafolder):
+        ''' Set source file paths and names
+        '''
 
+        # All OSSL data are download as a zipped subfolder with data given standard names as of below
+               
+        # if the path to rootFP starts with a dot '.' (= self) then use the default rootFP 
+        if self.input.jsonSpectraDataFilePath[0] == '.':
+            
+            removeStart = 1
+            
+            if self.input.jsonSpectraDataFilePath[1] in ['/']:
+                
+                removeStart = 2
+            
+            dataSubFP = self.input.jsonSpectraDataFilePath[removeStart: len(self.input.jsonSpectraDataFilePath)]
+               
+            jsonSpectraDataFilePath = os.path.join(dstRootFP, dataSubFP)
+            
+        else:
+            
+            jsonSpectraDataFilePath = self.input.jsonSpectraDataFilePath
+            
+        if self.input.jsonSpectraParamsFilePath[0] == '.':
+            
+            removeStart = 1
+            
+            if self.input.jsonSpectraParamsFilePath[1] in ['/']:
+                
+                removeStart = 2
+            
+            paramSubFP = self.input.jsonSpectraParamsFilePath[removeStart: len(self.input.jsonSpectraParamsFilePath)]
+               
+            jsonSpectraParamsFilePath = os.path.join(dstRootFP, paramSubFP)
+            
+
+        else:
+        
+            jsonSpectraParamsFilePath = self.input.jsonSpectraParamsFilePath
+            
+        if not os.path.exists(jsonSpectraDataFilePath):
+            
+            exitStr = 'Data file not found: %s ' %(jsonSpectraDataFilePath)
+            
+            exit(exitStr)
+
+        if not os.path.exists(jsonSpectraParamsFilePath):
+            
+            exitStr = 'Param file not found: %s ' %(jsonSpectraParamsFilePath)
+            
+            exit(exitStr)
+        
         # Open and load JSON data file
-        with open(self.input.jsonSpectraDataFilePath) as jsonF:
+        with open(jsonSpectraDataFilePath) as jsonF:
 
             self.jsonSpectraData = json.load(jsonF)
 
         # Open and load JSON parameter file
-        with open(self.input.jsonSpectraParamsFilePath) as jsonF:
+        with open(jsonSpectraParamsFilePath) as jsonF:
 
             self.jsonSpectraParams = json.load(jsonF)
 
@@ -743,7 +796,7 @@ class SpectraPlot(Obj):
 
             featureDf = self.abundanceDf[feature]
 
-            tarFeat = getattr(self.featurePlot.targetFeatureSymbols, feature)
+            tarFeat = getattr(self.targetFeatureSymbols, feature)
 
             ax = featureDf.plot.hist(bins=self.featurePlot.bins,color=tarFeat.color)
 
@@ -778,7 +831,7 @@ class SpectraPlot(Obj):
 
                 featureDf = self.abundanceDf[feature]
 
-                tarFeat = getattr(self.featurePlot.targetFeatureSymbols, feature)
+                tarFeat = getattr(self.targetFeatureSymbols, feature)
 
                 if len(self.featurePlot.targetFeatures) <= self.featurePlot.columns.ncolumns:
 
@@ -820,7 +873,7 @@ class SpectraPlot(Obj):
 
         for feature in self.featurePlot.targetFeatures:
 
-            tarFeat = getattr(self.featurePlot.targetFeatureSymbols, feature)
+            tarFeat = getattr(self.targetFeatureSymbols, feature)
 
             ax = self.abundanceDf.boxplot(column=[feature], patch_artist = True,
                                           boxprops = dict(facecolor = tarFeat.color))
@@ -854,7 +907,7 @@ class SpectraPlot(Obj):
 
                 col = f-(row*self.featurePlot.columns.ncolumns)
 
-                tarFeat = getattr(self.featurePlot.targetFeatureSymbols, feature)
+                tarFeat = getattr(self.targetFeatureSymbols, feature)
 
                 if len(self.featurePlot.targetFeatures) <= self.featurePlot.columns.ncolumns:
 
@@ -1170,10 +1223,13 @@ class SpectraPlot(Obj):
 
         return (title, text)
 
-    def _PilotPlot(self):
+    def _PilotPlot(self,rootFP,sourcedatafolder,dstRootFP):
         ''' Steer the sequence of processes for plotting spectra data in json format
         '''
 
+        # Set the source file names
+        self._SetSrcFPNs(rootFP, dstRootFP, sourcedatafolder)
+        
         # Use the wavelength as column headers
         columns = self.jsonSpectraData['waveLength']
 
@@ -1246,14 +1302,21 @@ def SetupProcesses(iniParams):
 
         CreateArrangeParamJson(jsonFP,iniParams['projFN'],'plot')
 
-    jsonProcessObjectL = ReadProjectFile(dstRootFP, iniParams['projFN'], jsonFP)
+    jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
 
-    #Loop over all json files and create Schemas and Tables
+    # Get the target Feature Symbols
+
+    targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
+    
+    #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
         print ('    jsonObj:', jsonObj)
 
         paramD = ReadPlotJson(jsonObj)
+        
+        # Add the targetFeatureSymbols
+        paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
 
         '''
         pp = pprint.PrettyPrinter(indent=2)
@@ -1268,29 +1331,30 @@ def SetupProcesses(iniParams):
         spectraPlt._SetDstFPNs()
 
         # Run the plotting
-        spectraPlt._PilotPlot()
+        spectraPlt._PilotPlot(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP)
 
 
 if __name__ == '__main__':
     ''' If script is run as stand alone
     '''
 
-
+    '''
     if len(sys.argv) != 2:
 
         sys.exit('Give the link to the json file to run the process as the only argument')
 
     #Get the json file
-    jsonFPN = sys.argv[1]
+    rootJsonFPN = sys.argv[1]
 
     if not os.path.exists(jsonFPN):
 
-        exitstr = 'json file not found: %s' %(jsonFPN)
+        exitstr = 'json file not found: %s' %(rootJsonFPN)
 
+    
+    rootJsonFPN = "/Local/path/to/plot_ossl.json"
     '''
-    jsonFPN = "/Local/path/to/plot_ossl.json"
-    '''
-
-    iniParams = ReadAnyJson(jsonFPN)
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/plot_ossl.json"
+    
+    iniParams = ReadAnyJson(rootJsonFPN)
 
     SetupProcesses(iniParams)

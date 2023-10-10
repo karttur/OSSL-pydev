@@ -2344,16 +2344,71 @@ class MachineLearningModel(Obj, RegressionModels):
 
         # Deep copy the parameters to self.soillineD
         self.plotD = deepcopy(paramD)
+                
+    def _SetSrcFPNs(self, rootFP, dstRootFP, sourcedatafolder):
+        ''' Set source file paths and names
+        '''
 
+        # All OSSL data are download as a zipped subfolder with data given standard names as of below
+               
+        # if the path to rootFP starts with a dot '.' (= self) then use the default rootFP 
+        if self.input.jsonSpectraDataFilePath[0] == '.':
+            
+            removeStart = 1
+            
+            if self.input.jsonSpectraDataFilePath[1] in ['/']:
+                
+                removeStart = 2
+            
+            dataSubFP = self.input.jsonSpectraDataFilePath[removeStart: len(self.input.jsonSpectraDataFilePath)]
+               
+            jsonSpectraDataFilePath = os.path.join(dstRootFP, dataSubFP)
+            
+        else:
+            
+            jsonSpectraDataFilePath = self.input.jsonSpectraDataFilePath
+            
+        if self.input.jsonSpectraParamsFilePath[0] == '.':
+            
+            removeStart = 1
+            
+            if self.input.jsonSpectraParamsFilePath[1] in ['/']:
+                
+                removeStart = 2
+            
+            paramSubFP = self.input.jsonSpectraParamsFilePath[removeStart: len(self.input.jsonSpectraParamsFilePath)]
+               
+            jsonSpectraParamsFilePath = os.path.join(dstRootFP, paramSubFP)
+            
+
+        else:
+        
+            jsonSpectraParamsFilePath = self.input.jsonSpectraParamsFilePath
+            
+        if not os.path.exists(jsonSpectraDataFilePath):
+            
+            exitStr = 'Data file not found: %s ' %(jsonSpectraDataFilePath)
+            
+            exit(exitStr)
+
+        if not os.path.exists(jsonSpectraParamsFilePath):
+            
+            exitStr = 'Param file not found: %s ' %(jsonSpectraParamsFilePath)
+            
+            exit(exitStr)
+            
+        self.dataFPN = jsonSpectraDataFilePath
+        
         # Open and load JSON data file
-        with open(self.input.jsonSpectraDataFilePath) as jsonF:
+        with open(jsonSpectraDataFilePath) as jsonF:
 
             self.jsonSpectraData = json.load(jsonF)
 
-        with open(self.input.jsonSpectraParamsFilePath) as jsonF:
+        # Open and load JSON parameter file
+        with open(jsonSpectraParamsFilePath) as jsonF:
 
             self.jsonSpectraParams = json.load(jsonF)
-
+            
     def _SetColorRamp(self,n):
         ''' Slice predefined colormap to discrete colors for each band
         '''
@@ -2746,7 +2801,7 @@ class MachineLearningModel(Obj, RegressionModels):
         ''' Set destination file paths and names
         '''
 
-        FP,FN = os.path.split(self.input.jsonSpectraDataFilePath)
+        FP,FN = os.path.split(self.dataFPN)
 
         FN = os.path.splitext(FN)[0]
 
@@ -2800,7 +2855,7 @@ class MachineLearningModel(Obj, RegressionModels):
         self.trainTestPickleFPND = {}
 
         self.KfoldPickleFPND = {}
-
+        
         # loop over targetfeatures
         for targetFeature in self.paramD['targetFeatures']:
 
@@ -2984,7 +3039,7 @@ class MachineLearningModel(Obj, RegressionModels):
 
         return (xLabel, yLabel, title, text)
 
-    def _PilotModeling(self):
+    def _PilotModeling(self,rootFP,sourcedatafolder,dstRootFP):
         ''' Steer the sequence of processes for modeling spectra data in json format
         '''
 
@@ -2995,6 +3050,12 @@ class MachineLearningModel(Obj, RegressionModels):
         if len(self.regressorModels) == 0:
 
             exit('Exiting - you have to set at least 1 regressor')
+            
+        # Set the source file names
+        self._SetSrcFPNs(rootFP, dstRootFP, sourcedatafolder)
+        
+        # set the destination file names
+        self._SetDstFPNs()
 
         # Get the band data as self.spectraDF
         self._GetBandData()
@@ -3221,12 +3282,18 @@ def SetupProcesses(iniParams):
 
     jsonProcessObjectL = ReadProjectFile(dstRootFP, iniParams['projFN'], jsonFP)
 
+    # Get the target Feature Symbols
+    targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
+        
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
         print ('    jsonObj:', jsonObj)
 
         paramD = ReadModelJson(jsonObj)
+        
+        # Add the targetFeatureSymbols
+        paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
 
         # Invoke the modeling
         mlModel = MachineLearningModel(paramD)
@@ -3239,32 +3306,31 @@ def SetupProcesses(iniParams):
         # Set the regressor models to apply
         mlModel._RegModelSelectSet()
 
-        # Set the dst file names
-        mlModel._SetDstFPNs()
-
         # run the modeling
-        mlModel._PilotModeling()
+        mlModel._PilotModeling(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP)
 
 if __name__ == '__main__':
     ''' If script is run as stand alone
     '''
 
-
+    '''
     if len(sys.argv) != 2:
 
         sys.exit('Give the link to the json file to run the process as the only argument')
 
     #Get the json file
-    jsonFPN = sys.argv[1]
+    rootJsonFPN = sys.argv[1]
 
     if not os.path.exists(jsonFPN):
 
-        exitstr = 'json file not found: %s' %(jsonFPN)
+        exitstr = 'json file not found: %s' %(rootJsonFPN)
 
+    
+    rootJsonFPN = "/Local/path/to/model_ossl.json"
     '''
-    jsonFPN = "/Local/path/to/model_ossl.json"
-    '''
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/model_ossl.json"
+    
 
-    iniParams = ReadAnyJson(jsonFPN)
+    iniParams = ReadAnyJson(rootJsonFPN)
 
     SetupProcesses(iniParams)
