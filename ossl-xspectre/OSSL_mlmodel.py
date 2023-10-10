@@ -3227,8 +3227,10 @@ class MachineLearningModel(Obj, RegressionModels):
                     if self.modelTests.Kfold.apply:
 
                         self._RegrModKFold()
+                        
+        if self.plot.rows.screenShow:
 
-        plt.show()
+            plt.show()
 
         if self.plot.rows.savePng:
 
