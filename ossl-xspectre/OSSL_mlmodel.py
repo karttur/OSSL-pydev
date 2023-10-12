@@ -3272,7 +3272,7 @@ def SetupProcesses(iniParams):
 
     dstRootFP, jsonFP = CheckMakeDocPaths(iniParams['rootpath'],
                                           iniParams['arrangeddatafolder'],
-                                          iniParams['jsonpath'],
+                                          iniParams['jsonfolder'],
                                           iniParams['sourcedatafolder'])
 
     if iniParams['createjsonparams']:
