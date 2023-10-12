@@ -3248,9 +3248,6 @@ class MachineLearningModel(Obj, RegressionModels):
 
                     self.columnFig[targetFeature].savefig(self.imageFPND[targetFeature]['allmodels'])
 
-
-        print (self.imageFPND[targetFeature]['allmodels'])
-
         self._DumpJson()
 
 def SetupProcesses(iniParams):
