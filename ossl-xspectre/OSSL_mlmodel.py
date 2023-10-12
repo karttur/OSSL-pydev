@@ -3327,7 +3327,7 @@ if __name__ == '__main__':
     
     rootJsonFPN = "/Local/path/to/model_ossl.json"
     '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/model_ossl.json"
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl.json"
     
 
     iniParams = ReadAnyJson(rootJsonFPN)

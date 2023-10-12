@@ -1440,7 +1440,7 @@ if __name__ == "__main__":
     
     rootJsonFPN = "/Local/path/to/import_ossl.json"
     '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/import_ossl.json"
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/import_ossl.json"
     iniParams = ReadAnyJson(rootJsonFPN)
 
     SetupProcesses(iniParams)

@@ -792,27 +792,29 @@ class SpectraPlot(Obj):
         """ Plot target feature distributions as histograms
         """
 
-        for feature in self.featurePlot.targetFeatures:
+        if self.featurePlot.singles.apply:
+            
+            for feature in self.featurePlot.targetFeatures:
+    
+                featureDf = self.abundanceDf[feature]
+    
+                tarFeat = getattr(self.targetFeatureSymbols, feature)
+    
+                ax = featureDf.plot.hist(bins=self.featurePlot.bins,color=tarFeat.color)
+    
+                ax.set_title(tarFeat.label)
+    
+                ax.set_xlabel(tarFeat.unit)
 
-            featureDf = self.abundanceDf[feature]
-
-            tarFeat = getattr(self.targetFeatureSymbols, feature)
-
-            ax = featureDf.plot.hist(bins=self.featurePlot.bins,color=tarFeat.color)
-
-            ax.set_title(tarFeat.label)
-
-            ax.set_xlabel(tarFeat.unit)
-
-            if self.featurePlot.screenDraw:
-
-                plt.show()
-
-            if self.featurePlot.savePng:
-
-                fig = ax.get_figure()
-
-                fig.savefig(self.histogramPlotFPND[feature])   # save the figure to file
+                if self.featurePlot.screenDraw:
+    
+                    plt.show()
+    
+                if self.featurePlot.savePng:
+    
+                    fig = ax.get_figure()
+    
+                    fig.savefig(self.histogramPlotFPND[feature])   # save the figure to file
 
         if len(self.featurePlot.targetFeatures) > 1 and (self.featurePlot.columns.apply):
 
@@ -871,26 +873,28 @@ class SpectraPlot(Obj):
         """ Plot target feature distributions as Box-Whisker plots
         """
 
-        for feature in self.featurePlot.targetFeatures:
-
-            tarFeat = getattr(self.targetFeatureSymbols, feature)
-
-            ax = self.abundanceDf.boxplot(column=[feature], patch_artist = True,
-                                          boxprops = dict(facecolor = tarFeat.color))
-
-            ax.set_title(tarFeat.label)
-
-            ax.set_xlabel(tarFeat.unit)
-
-            if self.featurePlot.screenDraw:
-
-                plt.show()
-
-            if self.featurePlot.savePng:
-
-                fig = ax.get_figure()
-
-                fig.savefig(self.boxwhiskerPlotFPND[feature])   # save the figure to file
+        if self.featurePlot.singles.apply:
+            
+            for feature in self.featurePlot.targetFeatures:
+    
+                tarFeat = getattr(self.targetFeatureSymbols, feature)
+    
+                ax = self.abundanceDf.boxplot(column=[feature], patch_artist = True,
+                                              boxprops = dict(facecolor = tarFeat.color))
+    
+                ax.set_title(tarFeat.label)
+    
+                ax.set_xlabel(tarFeat.unit)
+            
+                if self.featurePlot.screenDraw:
+    
+                    plt.show()
+    
+                if self.featurePlot.savePng:
+    
+                    fig = ax.get_figure()
+    
+                    fig.savefig(self.boxwhiskerPlotFPND[feature])   # save the figure to file
 
         if len(self.featurePlot.targetFeatures) > 1 and (self.featurePlot.columns.apply):
 
@@ -1353,7 +1357,7 @@ if __name__ == '__main__':
     
     rootJsonFPN = "/Local/path/to/plot_ossl.json"
     '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSLtest/plot_ossl.json"
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/plot_ossl.json"
     
     iniParams = ReadAnyJson(rootJsonFPN)
 
