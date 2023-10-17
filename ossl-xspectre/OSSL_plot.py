@@ -863,6 +863,7 @@ class SpectraPlot(Obj):
                         
         self.standardD = {}
         
+        '''
         # Do any standatdisation requested
         for column in substanceColumns:
             
@@ -895,7 +896,8 @@ class SpectraPlot(Obj):
                     
                     self.transformD[column] = 'log'
                     
-
+        '''
+        
     def _histogramPlot(self):
         """ Plot target feature distributions as histograms
         """

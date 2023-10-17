@@ -79,8 +79,8 @@ from scipy.stats import boxcox
 
 import pickle
 
-from sklearn.preprocessing import scale, StandardScaler
-
+from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer
+  
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.linear_model import BayesianRidge
 from sklearn.pipeline import Pipeline, make_pipeline
@@ -2613,13 +2613,62 @@ class MachineLearningModel(Obj, RegressionModels):
                     
                 elif targetTransform.boxcox:
                     
-                    self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    pt = PowerTransformer(method='box-cox')
                     
-                    print (boxcoxLambda)
+                    try:
                     
-                    SNULLE
+                        pt.fit( np.atleast_2d(self.abundanceDf[column]) )
+                        
+                        print(pt.lambdas_)
+                        
+                        print(pt.transform( np.atleast_2d(self.abundanceDf[column]) ))
+                        
+                        X = pt.transform( np.atleast_2d(self.abundanceDf[column]) )
+                        
+                        print (X)
+                        
+                        self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                                            
+                        self.transformD[column] = 'boxcox'
+                        
+                        self.abundanceDf[column]
+                        
+                        print ( self.abundanceDf[column] )
+                        
+                        SULLE
+                        
+                    except:
+                        
+                        print('cannot box-cox transform')
                     
-                    self.transformD[column] = 'boxcox'
+                    
+                    
+                elif targetTransform.yeojohnson:
+                    
+                    pt = PowerTransformer()
+                    
+                    pt.fit(np.atleast_2d(self.abundanceDf[column]))
+                    
+         
+                    
+                    print(pt.lambdas_)
+                    
+                    print(pt.transform( np.atleast_2d(self.abundanceDf[column]) ) )
+                    
+                    X = pt.transform( np.atleast_2d(self.abundanceDf[column]) )
+                    
+                    print (X)
+                    
+
+                    
+
+                        
+                elif targetTransform.quantile:
+                    
+                    pass
+                    
+                    #X = np.sort(rng.normal(loc=0.5, scale=0.25, size=(25, 1)), axis=0)
+                    #qt = QuantileTransformer(n_quantiles=10, random_state=0)
                     
             if hasattr(self.params.targetFeatureStandardise, column):
                     
