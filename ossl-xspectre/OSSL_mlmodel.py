@@ -58,6 +58,8 @@ import datetime
 
 from copy import deepcopy
 
+from math import sqrt
+
 # import pprint
 
 import csv
@@ -73,9 +75,11 @@ import matplotlib.pyplot as plt
 
 from scipy.stats import randint as sp_randint
 
+from scipy.stats import boxcox
+
 import pickle
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import scale, StandardScaler
 
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.linear_model import BayesianRidge
@@ -109,6 +113,8 @@ from sklearn.feature_selection import RFE, RFECV
 from sklearn.feature_selection import SelectFromModel
 
 from sklearn.inspection import permutation_importance
+from sklearn.metrics._regression import mean_absolute_error,\
+    mean_absolute_percentage_error, median_absolute_error
 
 #from cubist import Cubist
 
@@ -896,12 +902,18 @@ class RegressionModels:
 
         # Remove all samples where the targetfeature is NaN
         self.X = self.X[~np.isnan(self.X).any(axis=1)]
-
+        
         # Drop the added target column from self.X
         self.X = self.X.drop('target', axis=1)
 
         # Then also delete NaN from self.y
         self.y = self.y[~np.isnan(self.y)]
+        
+        # Remove all non-finite values
+        
+        self.X = self.X[np.isfinite(self.y)] 
+        
+        self.y = self.y[np.isfinite(self.y)] 
 
     def _SetTargetFeatureSymbol(self):
         '''
@@ -1175,12 +1187,39 @@ class RegressionModels:
 
         #Predict the independent variable in the test subset
         predict = model.predict(X_test)
+        
+        r2_total = r2_score(y_test, predict)
+        
+        rmse_total = sqrt(mean_squared_error(y_test, predict))
+        
+        medae_total = median_absolute_error(y_test, predict)
+        
+        mae_total = mean_absolute_error(y_test, predict)
+        
+        mape_total = mean_absolute_percentage_error(y_test, predict)
+        
+        
 
-        self.trainTestResultD[self.targetFeature][name] = {'mse':mean_squared_error(y_test, predict),
-                                                           'r2': r2_score(y_test, predict),
+        self.trainTestResultD[self.targetFeature][name] = {'rmse':rmse_total,
+                                                           'mae':mae_total,
+                                                           'medae': medae_total,
+                                                           'mape':mape_total,
+                                                           'r2': r2_total,
                                                            'hyperParameterSetting': self.jsonparamsD['regressionModels'][name]['hyperParams'],
                                                            'pickle': self.trainTestPickleFPND[self.targetFeature][name]
                                                            }
+        
+        self.trainTestSummaryD[self.targetFeature][name] = {'rmse':rmse_total,
+                                                           'mae':mae_total,
+                                                           'medae': medae_total,
+                                                           'mape':mape_total,
+                                                           'r2': r2_total,
+                                                           }
+        
+        # Set regressor scores to 3 decimals
+        self.trainTestResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestResultD[self.targetFeature][name].items()}
+
+        self.trainTestSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestSummaryD[self.targetFeature][name].items()}
 
         # Save the complete model with cPickle
         pickle.dump(model, open(self.trainTestPickleFPND[self.targetFeature][name],  'wb'))
@@ -1189,10 +1228,15 @@ class RegressionModels:
 
             infoStr =  '                trainTest Model: %s\n' %(name)
             infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['regressionModels'][name]['hyperParams'])
-            infoStr += '                    Mean squared error: %.2f\n' \
-            % self.trainTestResultD[self.targetFeature][name]['mse']
-            infoStr += '                    Variance (r2) score: %.2f\n' \
-            % self.trainTestResultD[self.targetFeature][name]['r2']
+
+            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
+            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
+            
+            infoStr += '                    Mean absolute error (MAE) total: %.2f\n' %( mae_total)
+
+            infoStr += '                    Mean absolute percent error (MAPE) total: %.2f\n' %( mape_total)
+
+            infoStr += '                    Median absolute error (MedAE) total: %.2f\n' %( medae_total)
 
             print (infoStr)
 
@@ -1210,7 +1254,7 @@ class RegressionModels:
                       % {'mod':name,'rmse':mean_squared_error(y_test, predict),'r2': r2_score(y_test, predict)} )
 
             txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\n nSamples: %(n)d' \
-                      % {'rmse':self.trainTestResultD[self.targetFeature][name]['mse'],
+                      % {'rmse':self.trainTestResultD[self.targetFeature][name]['rmse'],
                          'r2': self.trainTestResultD[self.targetFeature][name]['r2'],
                          'n': self.X.shape[0]} )
 
@@ -1221,21 +1265,83 @@ class RegressionModels:
         """
         """
 
-
         #Retrieve the model name and the model itself
         name,model = self.regrModel
 
         predict = model_selection.cross_val_predict(model, self.X, self.y, cv=self.modelTests.Kfold.folds)
 
-        mse = mean_squared_error(self.y, predict)
+        rmse_total = sqrt(mean_squared_error(self.y, predict))
 
-        r2 = r2_score(self.y, predict)
+        r2_total = r2_score(self.y, predict)
+        
+        scoring = 'r2'
 
-        self.KfoldResultD[self.targetFeature][name] = {'mse': mse,
-                                                           'r2': r2,
-                                                           'hyperParameterSetting': self.jsonparamsD['regressionModels'][name]['hyperParams'],
-                                                           'pickle': self.KfoldPickleFPND[self.targetFeature][name]
-                                                           }
+        r2_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+        
+        scoring = 'neg_mean_absolute_error'
+        
+        mae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_mean_absolute_percentage_error'
+        
+        mape_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_median_absolute_error'
+        
+        medae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_root_mean_squared_error'
+        
+        rmse_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        self.KfoldResultD[self.targetFeature][name] = {'rmse_total': rmse_total,
+                                                       'r2_total': r2_total,
+                                                       
+                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
+                                                       'rmse_fodled_std': rmse_folded.std(),
+                                                       
+                                                       'mae_folded_mean': -1*mae_folded.mean(),
+                                                       'mae_folded_std': mae_folded.std(),
+                                                       
+                                                       'mape_folded_mean': -1*mape_folded.mean(),
+                                                       'mape_folded_std': mape_folded.std(),
+                                                       
+                                                       'medae_folded_mean': medae_folded.mean(),
+                                                       'medae_folded_std': medae_folded.std(),
+                                                       
+                                                        'r2_folded_mean': r2_folded.mean(),
+                                                        'r2_folded_std': r2_folded.std(),
+                                                        'hyperParameterSetting': self.jsonparamsD['regressionModels'][name]['hyperParams'],
+                                                        'pickle': self.KfoldPickleFPND[self.targetFeature][name]
+                                                        }
+        
+        self.KfoldSummaryD[self.targetFeature][name] = {'rmse_total': rmse_total,
+                                                       'r2_total': r2_total,
+                                                       
+                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
+                                                       'rmse_fodled_std': rmse_folded.std(),
+                                                       
+                                                       'mae_folded_mean': -1*mae_folded.mean(),
+                                                       'mae_folded_std': mae_folded.std(),
+                                                       
+                                                       'mape_folded_mean': -1*mape_folded.mean(),
+                                                       'mape_folded_std': mape_folded.std(),
+                                                       
+                                                
+                                                       'medae_folded_mean': medae_folded.mean(),
+                                                       'medae_folded_std': medae_folded.std(),
+                                                       
+                                                 
+                                                        'r2_folded_mean': r2_folded.mean(),
+                                                        'r2_folded_std': r2_folded.std(),
+                                                        }
+        
+        # Set regressor scores to 3 decimals
+        self.KfoldResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldResultD[self.targetFeature][name].items()}
+
+        self.KfoldSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldSummaryD[self.targetFeature][name].items()}
+
+        
         # Save the complete model with cPickle
         pickle.dump(model, open(self.KfoldPickleFPND[self.targetFeature][name],  'wb'))
 
@@ -1243,10 +1349,18 @@ class RegressionModels:
 
             infoStr =  '                Kfold Model: %s\n' %(name)
             infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['regressionModels'][name]['hyperParams'])
-            infoStr += '                    Mean squared error: %.2f\n' \
-            % mse
-            infoStr += '                    Variance (r2) score: %.2f\n' \
-            % r2
+            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
+            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
+            
+            infoStr += '                    RMSE folded: %.2f (%.2f) \n' %( -1*rmse_folded.mean(),  rmse_folded.std())
+            
+            infoStr += '                    Mean absolute error (MAE) folded: %.2f (%.2f) \n' %( -1*mae_folded.mean(),  mae_folded.std())
+
+            infoStr += '                    Mean absolute percent error (MAPE) folded: %.2f (%.2f) \n' %( -1*mape_folded.mean(),  mape_folded.std())
+
+            infoStr += '                    Median absolute error (MedAE) folded: %.2f (%.2f) \n' %( -1*medae_folded.mean(),  medae_folded.std())
+
+            infoStr += '                    Variance (r2) score folded: %.2f (%.2f) \n' %( r2_folded.mean(),  r2_folded.std())
 
             print (infoStr)
 
@@ -1261,11 +1375,11 @@ class RegressionModels:
         #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
         suptitle = '%s Kfold model (nfolds = %s)' %(self.targetFeature, self.modelTests.Kfold.folds)
         title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
-                  % {'mod':name,'rmse':mse,'r2': r2} )
+                  % {'mod':name,'rmse':rmse_total,'r2': r2_total} )
 
         txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nSamples: %(n)d' \
-                      % {'rmse':self.KfoldResultD[self.targetFeature][name]['mse'],
-                         'r2': self.KfoldResultD[self.targetFeature][name]['r2'],
+                      % {'rmse':self.KfoldResultD[self.targetFeature][name]['rmse_total'],
+                         'r2': self.KfoldResultD[self.targetFeature][name]['r2_total'],
                          'n': self.X.shape[0]} )
 
         self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold')
@@ -1470,9 +1584,13 @@ class RegressionModels:
 
         for i in range(len(featureArray)):
 
-            permImpD[featureArray[i]] = {'mean_accuracy_decrease': permImportanceArray[i],
-                                         'std': errorArray[i]}
+            permImpD[featureArray[i]] = {'mean_accuracy_decrease': round(permImportanceArray[i],4),
+                                         'std': round(errorArray[i],4)}
+            
+            #print (permImpD[featureArray[i]])
 
+            #permImpD[featureArray[i]] = {k:(round(v,4) if isinstance(v,float) else v) for (k,v) in permImpD[featureArray[i]] }
+            
         self.modelFeatureImportanceD[self.targetFeature][name]['permutationsImportance'] = permImpD
 
         if self.plot.singles.apply:
@@ -1512,7 +1630,9 @@ class RegressionModels:
 
             for i in range(len(featureArray)):
 
-                featImpD[featureArray[i]] = {'linearCoefficient': importanceArray[i]}
+                featImpD[featureArray[i]] = {'linearCoefficient': round(importanceArray[i],4)}
+                
+                #featImpD[featureArray[i]] = {k:(round(v,4) if isinstance(v,float) else v) for (k,v) in featImpD[featureArray[i]]}
 
             self.modelFeatureImportanceD[self.targetFeature][name]['featureImportance'] = featImpD
 
@@ -1555,8 +1675,10 @@ class RegressionModels:
 
                 for i in range(len(featureArray)):
 
-                    featImpD[featureArray[i]] = {'MDI': importanceArray[i],
-                                                 'std': errorArray[i]}
+                    featImpD[featureArray[i]] = {'MDI': round(importanceArray[i],4),
+                                                 'std': round(errorArray[i],4)}
+                    
+                    #featImpD[featureArray[i]] = {k:(round(v,4) if isinstance(v,float) else v) for (k,v) in featImpD[featureArray[i]]}
 
             else:
 
@@ -1565,6 +1687,8 @@ class RegressionModels:
                 for i in range(len(featureArray)):
 
                     featImpD[featureArray[i]] = {'MDI': importanceArray[i]}
+                    
+                    featImpD[featureArray[i]] = {k:(round(v,4) if isinstance(v,float) else v) for (k,v) in featImpD[featureArray[i]]}
 
             self.modelFeatureImportanceD[self.targetFeature][name]['featureImportance'] = featImpD
 
@@ -2458,6 +2582,59 @@ class MachineLearningModel(Obj, RegressionModels):
 
         self.abundanceDf = pd.DataFrame(data=abundanceA, columns=substanceColumns)
 
+        self.transformD = {}
+        
+        # Do any transformation requested
+        for column in substanceColumns:
+            
+            self.transformD[column] = 'linear'
+            
+            if hasattr(self.params.targetFeatureTransform, column):
+                
+                targetTransform = getattr(self.params.targetFeatureTransform, column)
+                
+                if targetTransform.log:
+                    
+                    self.abundanceDf[column] = np.log(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'log'
+                    
+                elif targetTransform.sqrt:
+                    
+                    self.abundanceDf[column] = np.sqrt(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'sqrt'
+                    
+                elif targetTransform.reciprocal:
+                    
+                    self.abundanceDf[column] = np.reciprocal(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'reciprocal'
+                    
+                elif targetTransform.boxcox:
+                    
+                    self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    
+                    print (boxcoxLambda)
+                    
+                    SNULLE
+                    
+                    self.transformD[column] = 'boxcox'
+                    
+            if hasattr(self.params.targetFeatureStandardise, column):
+                    
+                standardise =  getattr(self.params.targetFeatureStandardise, column)
+                
+                if standardise:
+                    
+                    #X = scale(self.abundanceDf[column], axis=0, with_mean=True, with_std=True, copy=True)
+                    
+                    #print (X)
+                    
+                    self.abundanceDf[column] = (self.abundanceDf[column] - np.mean(self.abundanceDf[column]) ) / np.std(self.abundanceDf[column])
+                    
+                    #print (self.abundanceDf[column])
+                            
     def _StartStepSpectra(self, pdSpectra, startwl, stopwl, stepwl):
         '''
         '''
@@ -2831,15 +3008,39 @@ class MachineLearningModel(Obj, RegressionModels):
         if not os.path.exists(modelimageFP):
 
             os.makedirs(modelimageFP)
-
+            
+        # prefix tells if the modeling is done from manual setting, raw spectra, derivatives or both
+        
+        if self.manualFeatureSelection.apply:
+            
+            prefix = 'manual_'
+            
+        else:
+            
+            prefix =  'spectra_'
+               
+            if self.derivatives.apply:
+    
+                if self.derivatives.join:
+                    
+                    prefix =  'spectra+derivative_'
+        
+                else:
+        
+                    prefix =  'derivative_'
+                
         # if prefix is given it will be added to all output files
         if len(self.output.prefix) > 0 and self.output.prefix[len(self.output.prefix)-1] != '_':
 
-            prefix = '%s_' %(self.output.prefix)
+            prefix += '%s_' %(self.output.prefix)
 
         else:
 
-            prefix = self.output.prefix
+            prefix += self.output.prefix
+            
+        summaryJsonFN = '%s%s_summary.json' %(prefix, self.name)
+
+        self.summaryJsonFPN = os.path.join(modelresultFP,summaryJsonFN)
 
         regrJsonFN = '%s%s_results.json' %(prefix, self.name)
 
@@ -2918,7 +3119,11 @@ class MachineLearningModel(Obj, RegressionModels):
         '''
         '''
 
-        resultD = {}
+        resultD = {}; summaryD = {}
+        
+        resultD['targetFeatures'] = self.transformD
+        
+        summaryD['targetFeatures'] = self.transformD
 
         resultD['originalInputColumns'] = len(self.originalColumns)
 
@@ -2976,25 +3181,35 @@ class MachineLearningModel(Obj, RegressionModels):
         if self.modelTests.apply:
 
             resultD['modelResults'] = {}
+            
+            summaryD['modelResults'] = {}
 
             if self.modelTests.trainTest.apply:
 
                 resultD['modelResults']['trainTest'] = self.trainTestResultD
-
+                
+                summaryD['modelResults']['trainTest'] = self.trainTestSummaryD
+                
             if self.modelTests.Kfold.apply:
 
                 resultD['modelResults']['Kfold'] = self.KfoldResultD
+                
+                summaryD['modelResults']['Kfold'] = self.KfoldSummaryD
 
         #pp = pprint.PrettyPrinter(indent=2)
         #pp.pprint(resultD)
 
         jsonF = open(self.regrJsonFPN, "w")
-
+        
         json.dump(resultD, jsonF, indent = 2)
 
         jsonF = open(self.paramJsonFPN, "w")
 
         json.dump(self.paramD, jsonF, indent = 2)
+        
+        jsonF = open(self.summaryJsonFPN, "w")
+
+        json.dump(summaryD, jsonF, indent = 2)
 
     def _PlotTitleTextn(self, titleSuffix,plotskipstep):
         ''' Set plot title and annotation
@@ -3097,6 +3312,7 @@ class MachineLearningModel(Obj, RegressionModels):
         self.agglomeratedFeaturesD = {}; self.targetFeatureSelectedD = {}
         self.modelFeatureSelectedD = {}; self.modelFeatureImportanceD = {}
         self.finalFeatureLD = {}
+        self.trainTestSummaryD = {}; self.KfoldSummaryD  = {};
 
         # Create the subDicts for all model + target related presults
         for targetFeature in self.targetFeatures:
@@ -3105,6 +3321,7 @@ class MachineLearningModel(Obj, RegressionModels):
             self.KfoldResultD[targetFeature] = {}; self.modelFeatureSelectedD[targetFeature] = {}
             self.targetFeatureSelectedD[targetFeature] = {}; self.modelFeatureImportanceD[targetFeature] = {}
             self.finalFeatureLD[targetFeature] = {}
+            self.trainTestSummaryD[targetFeature] = {}; self.KfoldSummaryD[targetFeature]  = {};
 
             for regModel in self.jsonparamsD['regressionModels']:
 
@@ -3115,6 +3332,8 @@ class MachineLearningModel(Obj, RegressionModels):
                     self.modelFeatureSelectedD[targetFeature][regModel] = {}
                     self.modelFeatureImportanceD[targetFeature][regModel] = {}
                     self.finalFeatureLD[targetFeature][regModel] = {}
+                    self.trainTestSummaryD[targetFeature][regModel] = {} 
+                    self.KfoldSummaryD[targetFeature][regModel] = {}
 
                     if self.paramD['hyperParameterTuning']['apply'] and self.tuningParamD[hyperParameterTuning][regModel]['apply']:
 
@@ -3283,6 +3502,13 @@ def SetupProcesses(iniParams):
 
     # Get the target Feature Symbols
     targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
+    
+    # Get the target feature transform
+    targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])
+    
+    # Get the target feature standardisation
+    #targetFeatureStandardiseD = ReadAnyJson(iniParams['targetFeatureStandardise'])
+    
         
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
@@ -3293,6 +3519,12 @@ def SetupProcesses(iniParams):
         
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
+        
+        # Add the targetFeatureTransforms
+        paramD['targetFeatureTransform'] = targetFeatureTransformD['targetFeatureTransform']
+        
+        # Add the targetFeatureStandardisation
+        paramD['targetFeatureStandardise'] = targetFeatureTransformD['targetFeatureStandardise']
 
         # Invoke the modeling
         mlModel = MachineLearningModel(paramD)

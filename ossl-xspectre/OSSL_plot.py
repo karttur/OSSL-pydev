@@ -53,6 +53,8 @@ import csv
 # Third party imports
 import numpy as np
 
+from scipy.stats import boxcox
+
 import pandas as pd
 
 import matplotlib.pyplot as plt
@@ -787,6 +789,112 @@ class SpectraPlot(Obj):
             n += 1
 
         self.abundanceDf = pd.DataFrame(data=abundanceA, columns=substanceColumns)
+        
+        self.transformD = {}
+        
+        # Do any transformation requested
+        for column in substanceColumns:
+            
+            self.transformD[column] = 'linear'
+            
+            if hasattr(self.params.targetFeatureTransform, column):
+                
+                targetTransform = getattr(self.params.targetFeatureTransform, column)
+                
+                if targetTransform.log:
+                    
+                    self.abundanceDf[column] = np.log(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'log'
+                    
+                elif targetTransform.sqrt:
+                    
+                    self.abundanceDf[column] = np.sqrt(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'sqrt'
+                    
+                elif targetTransform.reciprocal:
+                    
+                    self.abundanceDf[column] = np.reciprocal(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'reciprocal'
+                    
+                elif targetTransform.boxcox:
+                    
+                    try:
+                    
+                        self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    
+                        self.transformD[column] = 'boxcox'
+                        
+                        print (boxcoxLambda)
+                        
+                    except:
+                        
+                        self.transformD[column] = 'linear'
+                        
+                elif targetTransform.yeojohnson:
+                    
+                    try:
+                    
+                        self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    
+                        self.transformD[column] = 'boxcox'
+                        
+                        print (boxcoxLambda)
+                        
+                    except:
+                        
+                        self.transformD[column] = 'linear'
+                        
+                elif targetTransform.quantile:
+                    
+                    try:
+                    
+                        self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    
+                        self.transformD[column] = 'boxcox'
+                        
+                        print (boxcoxLambda)
+                        
+                    except:
+                        
+                        self.transformD[column] = 'linear'
+                        
+        self.standardD = {}
+        
+        # Do any standatdisation requested
+        for column in substanceColumns:
+            
+            self.standardD[column] = 'none'
+            
+            if hasattr(self.params.targetFeatureStandardise, column):
+                
+                targetStandardise = getattr(self.params.targetFeatureStandardise, column)
+                
+                if targetStandardise.standardscaler:
+                    
+                    self.abundanceDf[column] = np.log(self.abundanceDf[column])
+                    
+                    standardMean = self.abundanceDf[column].mean()
+                    standardStd = self.abundanceDf[column].std()
+                    
+                    self.abundanceDf[column] = (self.abundanceDf[column]-standardMean) / standardStd
+                    
+                    self.standardD[column] = {'scaler': 'standardscaler', 'mean':standardMean, 'std': standardStd} 
+                    
+                elif targetStandardise.minmaxscaler:
+                    
+                    self.abundanceDf[column] = np.log(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'log'
+                    
+                elif targetStandardise.maxabsscaler:
+                    
+                    self.abundanceDf[column] = np.log(self.abundanceDf[column])
+                    
+                    self.transformD[column] = 'log'
+                    
 
     def _histogramPlot(self):
         """ Plot target feature distributions as histograms
@@ -815,7 +923,9 @@ class SpectraPlot(Obj):
                     fig = ax.get_figure()
     
                     fig.savefig(self.histogramPlotFPND[feature])   # save the figure to file
-
+                
+                plt.close(fig)
+                
         if len(self.featurePlot.targetFeatures) > 1 and (self.featurePlot.columns.apply):
 
             rows = ceil( len(self.featurePlot.targetFeatures) / self.featurePlot.columns.ncolumns )
@@ -826,12 +936,18 @@ class SpectraPlot(Obj):
             f = 0
 
             for feature in self.featurePlot.targetFeatures:
+                
+                print (feature)
+                    
+                    
 
                 row = floor(f / self.featurePlot.columns.ncolumns)
 
                 col = f-(row*self.featurePlot.columns.ncolumns)
+                
+                featureDf = self.abundanceDf[feature][np.isfinite( self.abundanceDf[feature] )]
 
-                featureDf = self.abundanceDf[feature]
+                #featureDf = self.abundanceDf[feature]
 
                 tarFeat = getattr(self.targetFeatureSymbols, feature)
 
@@ -869,11 +985,15 @@ class SpectraPlot(Obj):
 
                 featureFig.savefig(self.histogramsPlotFPN)   # save the figure to file
 
+            plt.close(featureFig)
+            
     def _boxWhiskerPlot(self):
         """ Plot target feature distributions as Box-Whisker plots
         """
 
         if self.featurePlot.singles.apply:
+            
+            BALLE
             
             for feature in self.featurePlot.targetFeatures:
     
@@ -895,7 +1015,9 @@ class SpectraPlot(Obj):
                     fig = ax.get_figure()
     
                     fig.savefig(self.boxwhiskerPlotFPND[feature])   # save the figure to file
-
+                
+                plt.close(fig)
+                
         if len(self.featurePlot.targetFeatures) > 1 and (self.featurePlot.columns.apply):
 
             rows = ceil( len(self.featurePlot.targetFeatures) / self.featurePlot.columns.ncolumns )
@@ -1178,7 +1300,7 @@ class SpectraPlot(Obj):
             fig.tight_layout()
 
         if self.spectraPlot.screenDraw:
-
+  
             plt.show()
 
         if self.spectraPlot.savePng:
@@ -1308,10 +1430,13 @@ def SetupProcesses(iniParams):
 
     jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
 
-    # Get the target Feature Symbols
 
+    # Get the target Feature Symbols
     targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
     
+    # Get the target feature transform
+    targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])
+            
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
@@ -1321,6 +1446,9 @@ def SetupProcesses(iniParams):
         
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
+                
+        # Add the targetFeatureTransforms
+        paramD['targetFeatureTransform'] = targetFeatureTransformD['targetFeatureTransform']
 
         '''
         pp = pprint.PrettyPrinter(indent=2)
