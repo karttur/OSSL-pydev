@@ -1855,19 +1855,20 @@ class RegressionModels:
 
                 return
 
-
-            select = SelectKBest(score_func=f_regression, k=n_features)
-
         else:
 
             return
 
+        # Apply SelectKBest.
+        select = SelectKBest(score_func=f_regression, k=n_features)
+        
         # Select and fit the independent variables, return the selected array
         X = select.fit_transform(self.X, self.y)
 
+        # Note that the returned select.get_feature_names_out() is not a list
         self.columns = select.get_feature_names_out()
-        # reset the covariates
 
+        # reset the covariates
         self.X = pd.DataFrame(X, columns=self.columns)
 
         self.targetFeatureSelectedD[self.targetFeature]['method'] ='SelectKBest'
@@ -2635,7 +2636,7 @@ class MachineLearningModel(Obj, RegressionModels):
                         
                         print ( self.abundanceDf[column] )
                         
-                        SULLE
+                        SNULLE
                         
                     except:
                         
@@ -2659,7 +2660,7 @@ class MachineLearningModel(Obj, RegressionModels):
                     
                     print (X)
                     
-
+                    BALLE
                     
 
                         
@@ -3383,7 +3384,16 @@ class MachineLearningModel(Obj, RegressionModels):
                     self.finalFeatureLD[targetFeature][regModel] = {}
                     self.trainTestSummaryD[targetFeature][regModel] = {} 
                     self.KfoldSummaryD[targetFeature][regModel] = {}
-
+                    
+                    # Set the transformation to the output dict      
+                    self.trainTestSummaryD[targetFeature]['transform'] = self.transformD[targetFeature]
+                    
+                    self.KfoldSummaryD[targetFeature]['transform'] = self.transformD[targetFeature]
+                    
+                    self.trainTestResultD[targetFeature]['transform'] = self.transformD[targetFeature]
+ 
+                    self.KfoldResultD[targetFeature]['transform'] = self.transformD[targetFeature]
+                        
                     if self.paramD['hyperParameterTuning']['apply'] and self.tuningParamD[hyperParameterTuning][regModel]['apply']:
 
                         self.tunedHyperParamsD[targetFeature][regModel] = {}
@@ -3483,8 +3493,15 @@ class MachineLearningModel(Obj, RegressionModels):
 
                     # Report the regressor model settings (hyper parameters)
                     self._ReportRegModelParams()
+                    
+                # uschanged columns from the start as lists
+                if type(self.columns) is list:
+                    
+                    self.finalFeatureLD[self.targetFeature][self.regrModel[0]] = self.columns
+                
+                else: # otherwise not
 
-                self.finalFeatureLD[self.targetFeature][self.regrModel[0]] = self.columns.tolist()
+                    self.finalFeatureLD[self.targetFeature][self.regrModel[0]] = self.columns.tolist()
 
                 if self.modelTests.apply:
 
@@ -3551,14 +3568,7 @@ def SetupProcesses(iniParams):
 
     # Get the target Feature Symbols
     targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
-    
-    # Get the target feature transform
-    targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])
-    
-    # Get the target feature standardisation
-    #targetFeatureStandardiseD = ReadAnyJson(iniParams['targetFeatureStandardise'])
-    
-        
+         
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
@@ -3569,11 +3579,17 @@ def SetupProcesses(iniParams):
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
         
+        #print (paramD)
+        #print (paramD['input']['targetfeaturetransforms'])
+        # Get the target feature transform
+        targetFeatureTransformD = ReadAnyJson(paramD['input']['targetfeaturetransforms'])
+    
         # Add the targetFeatureTransforms
         paramD['targetFeatureTransform'] = targetFeatureTransformD['targetFeatureTransform']
         
         # Add the targetFeatureStandardisation
         paramD['targetFeatureStandardise'] = targetFeatureTransformD['targetFeatureStandardise']
+
 
         # Invoke the modeling
         mlModel = MachineLearningModel(paramD)
@@ -3609,6 +3625,8 @@ if __name__ == '__main__':
     rootJsonFPN = "/Local/path/to/model_ossl.json"
     '''
     rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl.json"
+    
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_yeojohnson.json"
     
 
     iniParams = ReadAnyJson(rootJsonFPN)
