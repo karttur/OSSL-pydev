@@ -61,6 +61,12 @@ import matplotlib.pyplot as plt
 
 from math import ceil, floor
 
+from sklearn.preprocessing import PowerTransformer
+
+# from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer
+
+
+
 import pprint
 
 def Today():
@@ -835,17 +841,27 @@ class SpectraPlot(Obj):
                         
                 elif targetTransform.yeojohnson:
                     
-                    try:
+                    pt = PowerTransformer()
                     
-                        self.abundanceDf[column], boxcoxLambda = boxcox(self.abundanceDf[column])
+                    print ('column', column)
                     
-                        self.transformD[column] = 'boxcox'
-                        
-                        print (boxcoxLambda)
-                        
-                    except:
-                        
-                        self.transformD[column] = 'linear'
+                    print ('data',self.abundanceDf[column])
+                    
+                    pt.fit(np.atleast_2d(self.abundanceDf[column]))
+                    
+         
+                    
+                    print('lambdas',pt.lambdas_)
+                    
+                    print(pt.transform( np.atleast_2d(self.abundanceDf[column]) ) )
+                    
+                    X = pt.transform( np.atleast_2d(self.abundanceDf[column]) )
+                    
+                    print ('X',X)
+                    self.abundanceDf[column] = X.flatten()
+                    
+                    self.transformD[column] = 'yeojohnson'
+
                         
                 elif targetTransform.quantile:
                     

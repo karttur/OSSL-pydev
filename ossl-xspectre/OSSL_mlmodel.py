@@ -60,7 +60,7 @@ from copy import deepcopy
 
 from math import sqrt
 
-# import pprint
+import pprint
 
 import csv
 
@@ -115,6 +115,7 @@ from sklearn.feature_selection import SelectFromModel
 from sklearn.inspection import permutation_importance
 from sklearn.metrics._regression import mean_absolute_error,\
     mean_absolute_percentage_error, median_absolute_error
+from _ast import If
 
 #from cubist import Cubist
 
@@ -318,7 +319,6 @@ def MLmodelParams():
     paramD['globalFeatureSelection']['apply'] = False
 
     paramD['globalFeatureSelection']['varianceThreshold'] = {'threshold': 0.025}
-
 
     paramD['modelFeatureSelection'] = {}
 
@@ -685,7 +685,7 @@ def CheckMakeDocPaths(rootpath,arrangeddatafolder, jsonpath, sourcedatafolder=Fa
     if not os.path.exists(jsonFP):
 
         os.makedirs(jsonFP)
-
+        
     return dstRootFP, jsonFP
 
 def ReadImportParamsJson(jsonFPN):
@@ -700,7 +700,7 @@ def ReadImportParamsJson(jsonFPN):
 
     return ReadAnyJson(jsonFPN)
 
-def ReadProjectFile(dstRootFP,projFN, jsonFP):
+def ReadProjectFile(dstRootFP,projFN):
 
     projFPN = os.path.join(dstRootFP,projFN)
 
@@ -714,15 +714,225 @@ def ReadProjectFile(dstRootFP,projFN, jsonFP):
 
     print (infostr)
 
+    '''
     # Open and read the text file linking to all json files defining the project
     with open(projFPN) as f:
 
         jsonL = f.readlines()
-
+    
     # Clean the list of json objects from comments and whithespace etc
     jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonL if len(x) > 10 and x[0] != '#']
+    '''
+    
+    jsonProcessObjectD = ReadAnyJson(projFPN)
 
-    return jsonProcessObjectL
+    return jsonProcessObjectD
+
+def SetMultiCompDstFPNs(rootPath, arrangeDataPath, multiProjectComparisonD,targetFeatureSymbolsD):
+    '''
+    '''
+    multiCompFP = os.path.join(rootPath,arrangeDataPath,'multicomp')
+    
+    if not os.path.exists(multiCompFP):
+        
+        os.makedirs(multiCompFP)
+        
+    multiCompProjectFP = os.path.join(multiCompFP, multiProjectComparisonD['prefix'])
+    
+    if not os.path.exists(multiCompProjectFP):
+        
+        os.makedirs(multiCompProjectFP)
+        
+    multiCompProjectImageFP = os.path.join(multiCompProjectFP, 'images')
+    
+    if not os.path.exists(multiCompProjectImageFP):
+        
+        os.makedirs(multiCompProjectImageFP)
+        
+    multiCompProjectJsonFP = os.path.join(multiCompProjectFP, 'json')
+    
+    if not os.path.exists(multiCompProjectJsonFP):
+        
+        os.makedirs(multiCompProjectJsonFP)
+                   
+    indexL = ['coefficientImportance','permutationImportance','trainTest','Kfold']
+    
+    multCompImagesFPND = {}
+    
+    multCompJsonSummaryFPND = {}
+    
+    for targetFeature in multiProjectComparisonD['targetFeatures']:
+            
+        #print ('targetFeature', targetFeature)
+        
+        multCompSummaryFN = '%s_%s.json' %(multiProjectComparisonD['prefix'],targetFeature)
+        
+        multCompJsonSummaryFPND[targetFeature] = os.path.join(multiCompProjectJsonFP, multCompSummaryFN)
+                
+        multCompImagesFPND[targetFeature] = {}
+        
+           
+        for i in indexL:
+           
+            #print ('i',i)
+                      
+            multCompImagesFN = '%s_%s_%s.png' %(multiProjectComparisonD['prefix'],targetFeature, i)
+            
+            multCompImagesFPND[targetFeature][i] = os.path.join(multiCompProjectImageFP, multCompImagesFN)
+              
+    return multCompImagesFPND, multCompJsonSummaryFPND
+    
+def SetMultCompPlots(multiProjectComparisonD,targetFeatureSymbolsD, figCols):
+    '''
+    '''
+    
+    if figCols == 0:
+        
+        exit('Multi comparisson requres at least one feature importance or one model test')
+
+    multCompPlotIndexL = []
+    
+    multCompPlotsColumnD = {}
+    
+    multCompFig = {}
+    
+    multCompAxs = {}
+    
+    regressionModelL = []
+    
+    # Set the regression models to include:
+    
+    for r,row in enumerate(multiProjectComparisonD['regressionModels']):
+
+        if multiProjectComparisonD['regressionModels'][row]['apply']:
+            
+            regressionModelL.append(row)
+            
+    figRows = len(regressionModelL)
+        
+    # Set the columns to include
+    if multiProjectComparisonD['featureImportance']['apply']:
+        
+        if multiProjectComparisonD['featureImportance']['permutationImportance']['apply']:
+        
+            multCompPlotsColumnD['permutationImportance'] = len(multCompPlotIndexL)
+            multCompPlotIndexL.append('permutationImportance')
+              
+        if multiProjectComparisonD['featureImportance']['coefficientImportance']['apply']:
+        
+            multCompPlotsColumnD['coefficientImportance'] = len(multCompPlotIndexL)
+            multCompPlotIndexL.append('coefficientImportance')
+            
+    if multiProjectComparisonD['modelTests']['apply']:
+        
+        if multiProjectComparisonD['modelTests']['trainTest']['apply']:
+        
+            multCompPlotsColumnD['trainTest'] = len(multCompPlotIndexL)
+            multCompPlotIndexL.append('trainTest')
+            
+        if multiProjectComparisonD['modelTests']['Kfold']['apply']:
+        
+            multCompPlotsColumnD['Kfold'] = len(multCompPlotIndexL)
+            multCompPlotIndexL.append('Kfold')
+                       
+    # Set the figure size
+    if multiProjectComparisonD['plot']['figSize']['x'] == 0:
+        
+        xadd = multiProjectComparisonD['plot']['figSize']['xadd']
+
+        figSizeX = 3 * figCols + xadd
+
+    else:
+
+        figSizeX =multiProjectComparisonD['plot']['figSize']['x']
+
+    if multiProjectComparisonD['plot']['figSize']['y'] == 0:
+        
+        yadd = multiProjectComparisonD['plot']['figSize']['yadd']
+
+        figSizeY = 3 * figRows + yadd
+
+    else:
+
+        figSizeY =multiProjectComparisonD['plot']['figSize']['y']
+                
+    # Create column plots for each trial, with rows showing different regressors
+    for targetFeature in multiProjectComparisonD['targetFeatures']:
+        
+        #print ('    targetFeature',targetFeature)
+        
+        multCompFig[targetFeature] = {}; multCompAxs[targetFeature] = {}
+        
+        for index in multCompPlotIndexL:
+            
+            #print ('        index',index)
+
+            multCompFig[targetFeature][index], multCompAxs[targetFeature][index] = plt.subplots(figRows, figCols, figsize=(figSizeX, figSizeY))
+
+            if multiProjectComparisonD['plot']['tightLayout']:
+    
+                multCompFig[targetFeature][index].tight_layout()
+
+            # Set subplot wspace and hspace
+            if multiProjectComparisonD['plot']['hwspace']['wspace']:
+    
+                multCompFig[targetFeature][index].subplots_adjust(wspace=multiProjectComparisonD['plot']['hwspace']['wspace'])
+    
+            if multiProjectComparisonD['plot']['hwspace']['hspace']:
+    
+                multCompFig[targetFeature][index].subplots_adjust(hspace=multiProjectComparisonD['plot']['hwspace']['hspace'])
+    
+            label = targetFeatureSymbolsD['targetFeatureSymbols'][targetFeature]['label']
+            
+            if index in ['trainTest','Kfold']:
+                
+                suptitle = "Model test: %s; Target: %s (rows=regressors)\n" %(index, label)
+            
+            else:
+                
+                indextitle = '%s' %( index.replace('Importance', ' Importance'))
+                
+                suptitle = "Covariate evaluation: %s; Target: %s (rows=regressors)\n" %(indextitle, label)
+
+            '''
+            if self.varianceSelectTxt != None:
+    
+                suptitle += ', %s' %(self.varianceSelectTxt)
+    
+            if self.outlierTxt != None:
+    
+                suptitle +=  ', %s' %(self.outlierTxt)
+            '''
+            
+            # Set suptitle
+            multCompFig[targetFeature][index].suptitle( suptitle )
+    
+            # Set subplot titles, only for top row:
+            # for r,row in enumerate(regressionModelL):
+            #for r,row in enumerate([0]):
+    
+            #for c,col in enumerate(multCompPlotIndexL):
+            for c in range(figCols): 
+                
+                modelNrStr = '%s' %(c)
+            
+                if modelNrStr in multiProjectComparisonD['trialid']:
+                    
+                    trialId = multiProjectComparisonD['trialid'][modelNrStr]
+                
+                else:
+                
+                    trialId = 'trial_%s' %(c)
+                                
+                if figRows == 1:
+                
+                    multCompAxs[targetFeature][index][c].set_title( trialId )
+                
+                else:
+                    
+                    multCompAxs[targetFeature][index][0][c].set_title( trialId )
+                                          
+    return (multCompFig, multCompAxs, multCompPlotsColumnD)
 
 class Obj(object):
     ''' Convert json parameters to class objects
@@ -851,7 +1061,11 @@ def ReadModelJson(jsonFPN):
 
     :return paramD: parameters
     :rtype: dict
-   """
+    """
+    
+    if not os.path.exists(jsonFPN):
+       
+        print (jsonFPN)
 
     with open(jsonFPN) as jsonF:
 
@@ -939,7 +1153,7 @@ class RegressionModels:
 
                     self.featureSymbolSize = getattr(symbol, 'size')
 
-    def _PlotRegr(self, obs, pred, suptitle, title, txtstr,  txtstrHyperParams, regrModel, modeltest):
+    def _PlotRegr(self, obs, pred, suptitle, title, txtstr,  txtstrHyperParams, regrModel, modeltest, multCompAxs):
         '''
         '''
         if self.plot.singles.apply:
@@ -1108,8 +1322,77 @@ class RegressionModels:
                         else:
 
                             self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
+        
+        if self.multcompplot:
+ 
+            index = modeltest
+            columnNr = self.modelNr
+            
+            if (len(self.regressorModels)) == 1: # only 1 row in subplot
+
+                multCompAxs[self.targetFeature][index][columnNr].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                       s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
+                       marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
+
+                multCompAxs[self.targetFeature][index][columnNr].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
 
 
+                multCompAxs[self.targetFeature][index][columnNr].text(.05, .95, txtstr, ha='left', va='top',
+                                                transform=multCompAxs[self.targetFeature][index][columnNr].transAxes)
+
+                multCompAxs[self.targetFeature][index][columnNr].yaxis.set_label_position("right")
+
+            else:
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                       s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
+                       marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].text(.05, .95, txtstr, ha='left', va='top',
+                                                transform=multCompAxs[self.targetFeature][index][self.regrN, columnNr].transAxes)
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].yaxis.set_label_position("right")
+
+            # if at first column
+            if columnNr == 0:
+
+                if (len(self.regressorModels)) == 1:
+                        
+                    multCompAxs[self.targetFeature][index][columnNr].set_ylabel(self.regrModel[0])
+                    multCompAxs[self.targetFeature][index][columnNr].yaxis.set_label_position("left")
+
+                else:
+
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(self.regrModel[0])
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].yaxis.set_label_position("left")
+
+            # if at last column
+            if columnNr+1 == multCompAxs[self.targetFeature][index].shape[0]:
+
+
+                if (len(self.regressorModels)) == 1:
+
+                    multCompAxs[self.targetFeature][index][columnNr].set_ylabel('Predictions')
+
+                else:
+
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel('Predictions')
+
+
+
+            # if at last row
+            if self.regrN == self.nRegrModels-1:
+
+                if (len(self.regressorModels)) == 1:
+
+                    multCompAxs[self.targetFeature][index][columnNr].set_xlabel('Observations')
+
+                else:
+
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_xlabel('Observations')
+                    
     def _RegModelSelectSet(self):
         """ Set the regressors to evaluate
         """
@@ -1172,7 +1455,7 @@ class RegressionModels:
             self.modelSelectD['Cubist'] = []
         '''
 
-    def _RegrModTrainTest(self):
+    def _RegrModTrainTest(self, multCompAxs):
         '''
         '''
 
@@ -1258,10 +1541,9 @@ class RegressionModels:
                          'r2': self.trainTestResultD[self.targetFeature][name]['r2'],
                          'n': self.X.shape[0]} )
 
-            self._PlotRegr(y_test, predict, suptitle, title, txtstr, '',name, 'trainTest')
+            self._PlotRegr(y_test, predict, suptitle, title, txtstr, '',name, 'trainTest', multCompAxs)
 
-
-    def _RegrModKFold(self):
+    def _RegrModKFold(self, multCompAxs):
         """
         """
 
@@ -1298,7 +1580,7 @@ class RegressionModels:
                                                        'r2_total': r2_total,
                                                        
                                                        'rmse_folded_mean': -1*rmse_folded.mean(),
-                                                       'rmse_fodled_std': rmse_folded.std(),
+                                                       'rmse_folded_std': rmse_folded.std(),
                                                        
                                                        'mae_folded_mean': -1*mae_folded.mean(),
                                                        'mae_folded_std': mae_folded.std(),
@@ -1382,7 +1664,7 @@ class RegressionModels:
                          'r2': self.KfoldResultD[self.targetFeature][name]['r2_total'],
                          'n': self.X.shape[0]} )
 
-        self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold')
+        self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold', multCompAxs)
 
     def _PlotFeatureImportanceSingles(self, featureArray, importanceArray, errorArray, title, xyLabel, pngFPN):
         '''
@@ -1548,7 +1830,113 @@ class RegressionModels:
 
                         self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[importanceCategory]].set_xlabel('Features')
 
-    def _FeatureImportance(self):
+    def _MultCompPlotFeatureImportance(self, featureArray, importanceArray, errorArray, index, yLabel, multCompAxs):
+        '''
+        '''
+
+        nnFS = self.X.shape
+
+        text = 'nFeatures: %s' %(nnFS[1])
+
+        if self.targetFeatureSelectionTxt != None:
+
+            text += '\n%s' %(self.targetFeatureSelectionTxt)
+
+        if self.agglomerateTxt != None:
+
+            text += '\n%s' %(self.agglomerateTxt)
+
+        if self.modelFeatureSelectionTxt != None:
+
+            text += '\n%s' %(self.modelFeatureSelectionTxt)
+            
+        if 1 == 1:
+            #print (self.targetFeature,index)
+            #print (multCompAxs[self.targetFeature][index])
+            #print (self.regressionModelPlotColumnD)
+            #print (self.modelNr)
+            #print ( self.multCompPlotsColumns[index] )
+            #columnNr = getattr(self.multCompPlotsColumns, index)
+            columnNr = self.modelNr
+            #print (index)
+            #print ('columnNr', columnNr)
+            #print (multCompAxs[self.targetFeature][index])
+            
+            if (len(self.regressorModels)) == 1: # only state the column
+                
+                multCompAxs[self.targetFeature][index][columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
+
+                multCompAxs[self.targetFeature][index][columnNr].tick_params(labelleft=False)
+
+                multCompAxs[self.targetFeature][index][columnNr].text(.3, .95, text, ha='left', va='top',
+                                            transform=multCompAxs[self.targetFeature][index][columnNr].transAxes)
+
+                #multCompAxs[self.targetFeature][index][columnNr].set_ylabel(yLabel)
+
+            else:
+                                
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].tick_params(labelleft=False)
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].text(.3, .95, text, ha='left', va='top',
+                                                transform=multCompAxs[self.targetFeature][index][self.regrN, columnNr].transAxes)
+
+                #multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(yLabel)
+
+            if index == 'coefficientImportance':
+
+                if (len(self.regressorModels)) == 1:
+
+                    # Draw horisontal line ay y=y
+                    multCompAxs[self.targetFeature][index][columnNr].axhline(y=0, lw=1, c='black')
+
+                else:
+
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].axhline(y=0, lw=1, c='black')
+
+            # if at last row
+            if self.regrN == self.nRegrModels-1:
+
+                if (len(self.regressorModels)) == 1:
+
+                    multCompAxs[self.targetFeature][index][columnNr].set_xlabel('Features')
+
+                else:
+
+                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_xlabel('Features')
+                    
+        # if at first column
+        if columnNr == 0:
+
+            if (len(self.regressorModels)) == 1:
+                        
+                multCompAxs[self.targetFeature][index][columnNr].set_ylabel(self.regrModel[0])
+                multCompAxs[self.targetFeature][index][columnNr].yaxis.set_label_position("left")
+
+            else:
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(self.regrModel[0])
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].yaxis.set_label_position("left")
+
+        # if at last column
+        if columnNr+1 == multCompAxs[self.targetFeature][index].shape[0]:
+
+            if (len(self.regressorModels)) == 1:
+
+                multCompAxs[self.targetFeature][index][columnNr].set_ylabel(yLabel)
+                multCompAxs[self.targetFeature][index][columnNr].yaxis.set_label_position("right")
+
+            else:
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(yLabel)
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].yaxis.set_label_position("right")
+
+
+
+
+
+    def _FeatureImportance(self, multCompAxs):
         '''
         '''
 
@@ -1607,7 +1995,12 @@ class RegressionModels:
 
             self._PlotFeatureImportanceRows(featureArray, permImportanceArray, errorArray, 'permutationImportance', 'rel. Mean accur. decr.')
 
-        # Feature importance
+        if self.multcompplot:
+      
+            self._MultCompPlotFeatureImportance(featureArray, permImportanceArray, errorArray, 'permutationImportance', 'rel. Mean accur. decr.', multCompAxs)
+
+
+        # Coefficient importance
         if name in ['OLS','TheilSen','Huber', "Ridge", "ElasticNet", 'logistic', 'SVR']:
 
             if name in ['logistic','SVR']:
@@ -1648,7 +2041,11 @@ class RegressionModels:
 
             if self.plot.rows.apply:
 
-                self._PlotFeatureImportanceRows(featureArray, importanceArray, None, 'featureImportance','rel. coef. weight')
+                self._PlotFeatureImportanceRows(featureArray, importanceArray, None, 'coefficientImportance','rel. coef. weight')
+
+            if self.multcompplot:
+      
+                self._MultCompPlotFeatureImportance(featureArray, importanceArray, None, 'coefficientImportance', 'rel. coef. weight', multCompAxs)
 
         elif name in ['KnnRegr','MLP', 'Cubist']:
             ''' These models do not have any feature importance to report
@@ -2032,6 +2429,10 @@ class RegressionModels:
         """
         """
 
+        if self.removeOutliers.contamination == 0:
+            
+            return
+        
         #self.columnsX = [item for item in self.spectraDF.columns if item not in self.omitL]
 
         self.columnsX = [item for item in self.spectraDF.columns]
@@ -2641,9 +3042,6 @@ class MachineLearningModel(Obj, RegressionModels):
                     except:
                         
                         print('cannot box-cox transform')
-                    
-                    
-                    
                 elif targetTransform.yeojohnson:
                     
                     pt = PowerTransformer()
@@ -3032,14 +3430,11 @@ class MachineLearningModel(Obj, RegressionModels):
 
         FN = os.path.splitext(FN)[0]
 
-        #self.name = FN.split('_', 1)[1]
-
         modelFP = os.path.join(FP,'mlmodel')
 
         if not os.path.exists(modelFP):
 
             os.makedirs(modelFP)
-
 
         modelresultFP = os.path.join(modelFP,'json')
 
@@ -3060,7 +3455,6 @@ class MachineLearningModel(Obj, RegressionModels):
             os.makedirs(modelimageFP)
             
         # prefix tells if the modeling is done from manual setting, raw spectra, derivatives or both
-        
         if self.manualFeatureSelection.apply:
             
             prefix = 'manual_'
@@ -3082,11 +3476,11 @@ class MachineLearningModel(Obj, RegressionModels):
         # if prefix is given it will be added to all output files
         if len(self.output.prefix) > 0 and self.output.prefix[len(self.output.prefix)-1] != '_':
 
-            prefix += '%s_' %(self.output.prefix)
+            prefix = '%s_%s' %(self.output.prefix, prefix)
 
         else:
 
-            prefix += self.output.prefix
+            prefix = self.output.prefix
             
         summaryJsonFN = '%s%s_summary.json' %(prefix, self.name)
 
@@ -3169,11 +3563,15 @@ class MachineLearningModel(Obj, RegressionModels):
         '''
         '''
 
-        resultD = {}; summaryD = {}
+        resultD = {}; summaryD = {}; self.multCompSummaryD = {}
         
-        resultD['targetFeatures'] = self.transformD
+        for targetFeature in self.targetFeatures:
         
-        summaryD['targetFeatures'] = self.transformD
+            self.multCompSummaryD[targetFeature] = {}
+        
+        #resultD['targetFeatures'] = self.transformD
+        
+        #self.summaryD['targetFeatures'] = self.transformD
 
         resultD['originalInputColumns'] = len(self.originalColumns)
 
@@ -3240,11 +3638,27 @@ class MachineLearningModel(Obj, RegressionModels):
                 
                 summaryD['modelResults']['trainTest'] = self.trainTestSummaryD
                 
+                for targetFeature in self.targetFeatures:
+                
+                    self.multCompSummaryD[targetFeature]['trainTest'] = self.trainTestSummaryD[targetFeature]
+                
+                    self.multCompSummaryD[targetFeature]['parameters'] = self.paramJsonFPN
+                    
+                    self.multCompSummaryD[targetFeature]['results'] = self.regrJsonFPN
+                    
             if self.modelTests.Kfold.apply:
 
                 resultD['modelResults']['Kfold'] = self.KfoldResultD
                 
                 summaryD['modelResults']['Kfold'] = self.KfoldSummaryD
+                
+                for targetFeature in self.targetFeatures:
+                
+                    self.multCompSummaryD[targetFeature]['Kfold'] = self.KfoldSummaryD[targetFeature]
+                    
+                    self.multCompSummaryD[targetFeature]['parameters'] = self.paramJsonFPN
+                    
+                    self.multCompSummaryD[targetFeature]['results'] = self.regrJsonFPN
 
         #pp = pprint.PrettyPrinter(indent=2)
         #pp.pprint(resultD)
@@ -3304,7 +3718,7 @@ class MachineLearningModel(Obj, RegressionModels):
 
         return (xLabel, yLabel, title, text)
 
-    def _PilotModeling(self,rootFP,sourcedatafolder,dstRootFP):
+    def _PilotModeling(self,rootFP,sourcedatafolder,dstRootFP, multCompFig, multCompAxs):
         ''' Steer the sequence of processes for modeling spectra data in json format
         '''
 
@@ -3472,7 +3886,7 @@ class MachineLearningModel(Obj, RegressionModels):
 
                 if self.featureImportance.apply:
 
-                    self._FeatureImportance()
+                    self._FeatureImportance(multCompAxs)
 
                 if self.hyperParameterTuning.apply:
 
@@ -3507,11 +3921,11 @@ class MachineLearningModel(Obj, RegressionModels):
 
                     if self.modelTests.trainTest.apply:
 
-                        self._RegrModTrainTest()
+                        self._RegrModTrainTest(multCompAxs)
 
                     if self.modelTests.Kfold.apply:
 
-                        self._RegrModKFold()
+                        self._RegrModKFold(multCompAxs)
                         
         if self.plot.rows.screenShow:
 
@@ -3532,7 +3946,19 @@ class MachineLearningModel(Obj, RegressionModels):
                 for targetFeature in self.targetFeatures:
 
                     self.columnFig[targetFeature].savefig(self.imageFPND[targetFeature]['allmodels'])
+                    
+        for regModel in self.paramD['regressionModels']:
 
+            if self.paramD['regressionModels'][regModel]['apply']:
+        
+                plt.close(fig=self.columnFig[regModel])
+                
+        for targetFeature in self.targetFeatures:
+            
+            if self.plot.rows.regressionModels.apply:
+
+                plt.close(fig=self.columnFig[targetFeature])
+        
         self._DumpJson()
 
 def SetupProcesses(iniParams):
@@ -3564,11 +3990,44 @@ def SetupProcesses(iniParams):
 
         CreateArrangeParamJson(jsonFP,iniParams['projFN'],'mlmodel')
 
-    jsonProcessObjectL = ReadProjectFile(dstRootFP, iniParams['projFN'], jsonFP)
-
+    jsonProcessObjectD = ReadProjectFile(dstRootFP, iniParams['projFN'])
+    
+        
+    #jsonProcessObjectL = jsonProcessObjectD['projectFiles']
+    jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonProcessObjectD['projectFiles'] if len(x) > 10 and x[0] != '#']
+    
     # Get the target Feature Symbols
     targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
-         
+    
+    if not 'multiprojectcomparison' in jsonProcessObjectD or not jsonProcessObjectD['multiprojectcomparison']:
+        
+        multiProjectComparisonD = {'apply': False} 
+    
+    elif not os.path.exists(jsonProcessObjectD['multiprojectcomparison']):
+        
+        multiProjectComparisonD = {'apply': False} 
+        
+    else:    
+    
+        multiProjectComparisonD = ReadAnyJson(jsonProcessObjectD['multiprojectcomparison'])
+        
+    multCompFig = multCompAxs = False
+    
+    if multiProjectComparisonD['apply']:
+        
+        multCompImagesFPND, multCompJsonSummaryFPND = SetMultiCompDstFPNs(iniParams['rootpath'],iniParams['arrangeddatafolder'],
+                                                                          multiProjectComparisonD,targetFeatureSymbolsD)
+        
+        multCompFig, multCompAxs, multCompPlotsColumns = SetMultCompPlots( multiProjectComparisonD,targetFeatureSymbolsD,len(jsonProcessObjectL) )
+
+        multCompSummaryD = {}
+        
+        for targetFeature in multiProjectComparisonD['targetFeatures']:
+            
+            multCompSummaryD[targetFeature] = {}
+            
+        
+    modelNr = 0    
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
@@ -3579,8 +4038,43 @@ def SetupProcesses(iniParams):
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
         
-        #print (paramD)
-        #print (paramD['input']['targetfeaturetransforms'])
+        # paramD['regressorSymbols'] =
+        
+        paramD['multcompplot'] = False
+        
+        if multiProjectComparisonD['apply']:
+            
+            paramD['multcompplot'] = True
+            
+            paramD['modelNr'] = modelNr
+            
+            paramD['multCompPlotsColumns'] = multCompPlotsColumns
+            
+            # Replace the list of targetFeatures in paramD
+            paramD['targetFeatures'] = multiProjectComparisonD['targetFeatures']
+            
+            # Replace the applied regressors, but not the hyper parameter definitions    
+            for regressor in paramD['regressionModels']:
+                               
+                paramD['regressionModels'][regressor]['apply'] = multiProjectComparisonD['regressionModels'][regressor]['apply'] 
+                
+            # Replace all the processing steps boolen apply
+            processStepL = ['removeOutliers', 'manualFeatureSelection',
+                            'globalFeatureSelection','targetFeatureSelection',
+                            'modelFeatureSelection','featureAgglomeration',
+                            'hyperParameterTuning']
+            
+            for p in processStepL:
+                
+                paramD[p]['apply'] = multiProjectComparisonD[p]['apply']
+                
+            # Replace the feature importance reporting
+            paramD['featureImportance'] = multiProjectComparisonD['featureImportance']
+            
+             
+            # Replace the model test
+            paramD['modelTests'] = multiProjectComparisonD['modelTests']                          
+            
         # Get the target feature transform
         targetFeatureTransformD = ReadAnyJson(paramD['input']['targetfeaturetransforms'])
     
@@ -3589,7 +4083,6 @@ def SetupProcesses(iniParams):
         
         # Add the targetFeatureStandardisation
         paramD['targetFeatureStandardise'] = targetFeatureTransformD['targetFeatureStandardise']
-
 
         # Invoke the modeling
         mlModel = MachineLearningModel(paramD)
@@ -3603,7 +4096,50 @@ def SetupProcesses(iniParams):
         mlModel._RegModelSelectSet()
 
         # run the modeling
-        mlModel._PilotModeling(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP)
+        mlModel._PilotModeling(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP, multCompFig, multCompAxs)
+        
+        
+        if multiProjectComparisonD['apply']: 
+            
+            modelNrStr = '%s' %(modelNr)
+            
+            if modelNrStr in multiProjectComparisonD['trialid']:
+                
+                trialid = multiProjectComparisonD['trialid'][modelNrStr]
+            
+            else:
+            
+                trialid = 'trial_%s' %(modelNr)
+            
+            for targetFeature in mlModel.targetFeatures:
+            
+                multCompSummaryD[targetFeature][trialid] = mlModel.multCompSummaryD[targetFeature]
+               
+        modelNr += 1
+    
+    if multiProjectComparisonD['apply']: 
+        
+        print ('All models in project Done') 
+        
+        if multiProjectComparisonD['plot']['screenShow']:
+        
+            plt.show()
+        
+        #pp = pprint.PrettyPrinter(indent=2)
+        #pp.pprint(multCompSummaryD)
+        
+        for targetFeature in multCompFig:
+    
+            for index in multCompFig[targetFeature]:
+                
+                jsonD = {targetFeature : multCompSummaryD[targetFeature]}
+                
+                DumpAnyJson(jsonD,multCompJsonSummaryFPND[targetFeature]) 
+                
+                if multiProjectComparisonD['plot']['savePng']: 
+                             
+                    multCompFig[targetFeature][index].savefig( multCompImagesFPND[targetFeature][index] )
+        
 
 if __name__ == '__main__':
     ''' If script is run as stand alone
@@ -3626,9 +4162,24 @@ if __name__ == '__main__':
     '''
     rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl.json"
     
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_yeojohnson.json"
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_remove-outliers-comp.json'
     
-
+    #rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_yeojohnson.json"
+    
+    
     iniParams = ReadAnyJson(rootJsonFPN)
+        
+    if type( iniParams['projFN']) is list: 
+          
+        for proj in iniParams['projFN']:
+            
+            projParams = deepcopy(iniParams)
+            
+            projParams['projFN'] = proj
+            
+            SetupProcesses(projParams)
+           
 
-    SetupProcesses(iniParams)
+    else:
+        
+        SetupProcesses(iniParams)
