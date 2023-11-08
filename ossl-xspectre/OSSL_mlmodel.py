@@ -2555,16 +2555,16 @@ class RegressionModels:
                     print ('                    ',self.aggBandL[x])
 
         # Reset the covariates (self.X)
-        X = ward.transform(self.X)
+        #X = ward.transform(self.X)
 
         # Reset the main dataframe
-        self.spectraDF = pd.DataFrame(X, columns=self.aggColumnL)
+        #self.spectraDF = pd.DataFrame(X, columns=self.aggColumnL)
 
         # Reset the main column list
         self.columns = self.aggColumnL
 
         # reset the covariates
-        self.X = pd.DataFrame(X, columns=self.aggColumnL)
+        self.X = pd.DataFrame(self.X, columns=self.aggColumnL)
 
     def _TuneWardClustering(self):
         ''' Determines the optimal nr of cluster
@@ -4164,12 +4164,18 @@ if __name__ == '__main__':
     
     rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_remove-outliers-comp.json'
     
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_glob-feat-select_comp.json'
+    
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-select_comp.json'
     #rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_yeojohnson.json"
+    
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-agglom_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-agglom_comp.json'
     
     
     iniParams = ReadAnyJson(rootJsonFPN)
-        
-    if type( iniParams['projFN']) is list: 
+            
+if type( iniParams['projFN']) is list: 
           
         for proj in iniParams['projFN']:
             
@@ -4180,6 +4186,6 @@ if __name__ == '__main__':
             SetupProcesses(projParams)
            
 
-    else:
+else:
         
-        SetupProcesses(iniParams)
+    SetupProcesses(iniParams)
