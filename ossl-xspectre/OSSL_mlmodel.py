@@ -117,7 +117,7 @@ from sklearn.metrics._regression import mean_absolute_error,\
     mean_absolute_percentage_error, median_absolute_error
 from _ast import If
 
-#from cubist import Cubist
+from cubist import Cubist
 
 def Today():
 
@@ -1449,12 +1449,19 @@ class RegressionModels:
             self.regressorModels.append(('MLP', mlp))
 
             self.modelSelectD['MLP'] = []
-        '''
+        
         if hasattr(self.regressionModels, 'Cubist') and self.regressionModels.Cubist.apply:
             self.regressorModels.append(('Cubist', Cubist( **self.jsonparamsD['regressionModels']['Cubist']['hyperParams'])))
             self.modelSelectD['Cubist'] = []
+        
+    def _CheckParams(self, jsonProcessFN):
+        ''' Check parameters
         '''
-
+        
+        if not hasattr(self,'targetFeatures'):
+            exitStr = 'Exiting: the modelling process file %s\n    has not targetFeature' %(jsonProcessFN)
+            exit(exitStr)
+        
     def _RegrModTrainTest(self, multCompAxs):
         '''
         '''
@@ -2117,23 +2124,29 @@ class RegressionModels:
         spectraDF = self.spectraDF[ self.columns  ]
 
         self.manualFeatureSelectdRawBands =  self.columns
+        
+        self.manualFeatureSelectdDerivates = []
+        
         # Create any derivative covariates requested
-        for b in range(len(self.manualFeatureSelection.derivatives.firstWaveLength)):
+        
+        if hasattr(self.manualFeatureSelection.derivatives, 'firstWaveLength'):
+            
+            for b in range(len(self.manualFeatureSelection.derivatives.firstWaveLength)):
+    
+                bandL = [self.manualFeatureSelection.derivatives.firstWaveLength[b],
+                         self.manualFeatureSelection.derivatives.lastWaveLength[b]]
 
-            bandL = [self.manualFeatureSelection.derivatives.firstWaveLength[b],
-                     self.manualFeatureSelection.derivatives.lastWaveLength[b]]
+            self.manualFeatureSelectdDerivates = bandL
 
-        self.manualFeatureSelectdDerivates = bandL
+            derviationBandDF = self.spectraDF[ bandL  ]
 
-        derviationBandDF = self.spectraDF[ bandL  ]
+            bandFrame, bandColumn = self._SpectraDerivativeFromDf(derviationBandDF,bandL)
 
-        bandFrame, bandColumn = self._SpectraDerivativeFromDf(derviationBandDF,bandL)
+            frames = [spectraDF,bandFrame]
 
-        frames = [spectraDF,bandFrame]
+            spectraDF = pd.concat(frames, axis=1)
 
-        spectraDF = pd.concat(frames, axis=1)
-
-        self.columns.extend(bandColumn)
+            self.columns.extend(bandColumn)
 
         # reset self.spectraDF
         self.spectraDF = spectraDF
@@ -3991,8 +4004,7 @@ def SetupProcesses(iniParams):
         CreateArrangeParamJson(jsonFP,iniParams['projFN'],'mlmodel')
 
     jsonProcessObjectD = ReadProjectFile(dstRootFP, iniParams['projFN'])
-    
-        
+       
     #jsonProcessObjectL = jsonProcessObjectD['projectFiles']
     jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonProcessObjectD['projectFiles'] if len(x) > 10 and x[0] != '#']
     
@@ -4015,6 +4027,14 @@ def SetupProcesses(iniParams):
     
     if multiProjectComparisonD['apply']:
         
+        if (len(jsonProcessObjectL) < 2):
+            
+            exitStr = 'Exiting: multi comparison projects must have at least 2 project files\n    %s has only %s' %(iniParams['projFN'],(len(jsonProcessObjectL)))
+            
+            exitStr += '\n    Either add more projects or remove the "multiprojectcomparison" command'
+            
+            exit(exitStr)
+                
         multCompImagesFPND, multCompJsonSummaryFPND = SetMultiCompDstFPNs(iniParams['rootpath'],iniParams['arrangeddatafolder'],
                                                                           multiProjectComparisonD,targetFeatureSymbolsD)
         
@@ -4039,7 +4059,7 @@ def SetupProcesses(iniParams):
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
         
         # paramD['regressorSymbols'] =
-        
+       
         paramD['multcompplot'] = False
         
         if multiProjectComparisonD['apply']:
@@ -4094,6 +4114,8 @@ def SetupProcesses(iniParams):
 
         # Set the regressor models to apply
         mlModel._RegModelSelectSet()
+        
+        mlModel._CheckParams(os.path.split(jsonObj)[1]);
 
         # run the modeling
         mlModel._PilotModeling(iniParams['rootpath'],iniParams['sourcedatafolder'],  dstRootFP, multCompFig, multCompAxs)
@@ -4159,19 +4181,25 @@ if __name__ == '__main__':
 
     
     rootJsonFPN = "/Local/path/to/model_ossl.json"
-    '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl.json"
     
-    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_remove-outliers-comp.json'
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl.json"
     
-    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_glob-feat-select_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_remove-outliers-comp.json'
     
-    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-select_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_glob-feat-select_comp.json'
+    
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-select_comp.json'
     #rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_yeojohnson.json"
     
-    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-agglom_comp.json'
-    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/model_ossl_tar-feat-agglom_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-agglom_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-agglom_comp.json'
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-agglom2_comp.json'
+    #rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_theodor_error.json'
     
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-pretransform_comp.json'
+    '''
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_AMS-sensors-wls.json'
+
     
     iniParams = ReadAnyJson(rootJsonFPN)
             
