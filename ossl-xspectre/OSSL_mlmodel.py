@@ -2129,24 +2129,26 @@ class RegressionModels:
         
         # Create any derivative covariates requested
         
-        if hasattr(self.manualFeatureSelection.derivatives, 'firstWaveLength'):
-            
-            for b in range(len(self.manualFeatureSelection.derivatives.firstWaveLength)):
+        if hasattr(self.manualFeatureSelection, 'derivatives'):
+        
+            if hasattr(self.manualFeatureSelection.derivatives, 'firstWaveLength'):
+                
+                for b in range(len(self.manualFeatureSelection.derivatives.firstWaveLength)):
+        
+                    bandL = [self.manualFeatureSelection.derivatives.firstWaveLength[b],
+                             self.manualFeatureSelection.derivatives.lastWaveLength[b]]
     
-                bandL = [self.manualFeatureSelection.derivatives.firstWaveLength[b],
-                         self.manualFeatureSelection.derivatives.lastWaveLength[b]]
-
-            self.manualFeatureSelectdDerivates = bandL
-
-            derviationBandDF = self.spectraDF[ bandL  ]
-
-            bandFrame, bandColumn = self._SpectraDerivativeFromDf(derviationBandDF,bandL)
-
-            frames = [spectraDF,bandFrame]
-
-            spectraDF = pd.concat(frames, axis=1)
-
-            self.columns.extend(bandColumn)
+                self.manualFeatureSelectdDerivates = bandL
+    
+                derviationBandDF = self.spectraDF[ bandL  ]
+    
+                bandFrame, bandColumn = self._SpectraDerivativeFromDf(derviationBandDF,bandL)
+    
+                frames = [spectraDF,bandFrame]
+    
+                spectraDF = pd.concat(frames, axis=1)
+    
+                self.columns.extend(bandColumn)
 
         # reset self.spectraDF
         self.spectraDF = spectraDF
@@ -4078,8 +4080,13 @@ def SetupProcesses(iniParams):
                                
                 paramD['regressionModels'][regressor]['apply'] = multiProjectComparisonD['regressionModels'][regressor]['apply'] 
                 
-            # Replace all the processing steps boolen apply
-            processStepL = ['removeOutliers', 'manualFeatureSelection',
+            # Replace all the processing steps boolean apply
+            '''processStepL = ['removeOutliers', 'manualFeatureSelection',
+                            'globalFeatureSelection','targetFeatureSelection',
+                            'modelFeatureSelection','featureAgglomeration',
+                            'hyperParameterTuning']'''
+            
+            processStepL = ['removeOutliers', 
                             'globalFeatureSelection','targetFeatureSelection',
                             'modelFeatureSelection','featureAgglomeration',
                             'hyperParameterTuning']
