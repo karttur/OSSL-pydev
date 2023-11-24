@@ -1134,6 +1134,8 @@ class RegressionModels:
         '''
 
         self.featureSymbolColor = 'black'
+        
+        self.featureSymbolAlpha = 1.0
 
         self.featureSymbolMarker = '.'
 
@@ -1148,6 +1150,10 @@ class RegressionModels:
                 if hasattr(symbol, 'color'):
 
                     self.featureSymbolColor = getattr(symbol, 'color')
+                    
+                if hasattr(symbol, 'alpha'):
+
+                    self.featureSymbolAlpha = getattr(symbol, 'alpha')
 
                 if hasattr(symbol, 'size'):
 
@@ -1160,6 +1166,7 @@ class RegressionModels:
 
             fig, ax = plt.subplots()
             ax.scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                       alpha=self.featureSymbolAlpha,
                        s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                        marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
             ax.plot([obs.min(), obs.max()], [obs.min(), obs.max()], 'k--', lw=1)
@@ -1190,7 +1197,8 @@ class RegressionModels:
 
                     if len(self.targetFeatures) == 1:
 
-                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                        self.columnAxs[self.regrModel[0]][self.targetFeaturePlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  
+                                color=self.featureSymbolColor, alpha=self.featureSymbolAlpha,
                                s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                                marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
 
@@ -1250,7 +1258,8 @@ class RegressionModels:
 
                     if (len(self.regressorModels)) == 1:
 
-                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                        self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  
+                               color=self.featureSymbolColor, alpha=self.featureSymbolAlpha,
                                s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                                marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
 
@@ -1264,7 +1273,8 @@ class RegressionModels:
 
                     else:
 
-                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                        self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  
+                                color=self.featureSymbolColor, alpha=self.featureSymbolAlpha,
                                s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                                marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
 
@@ -1330,7 +1340,8 @@ class RegressionModels:
             
             if (len(self.regressorModels)) == 1: # only 1 row in subplot
 
-                multCompAxs[self.targetFeature][index][columnNr].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                multCompAxs[self.targetFeature][index][columnNr].scatter(obs, pred, edgecolors=(0, 0, 0),  
+                        color=self.featureSymbolColor, alpha=self.featureSymbolAlpha,
                        s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                        marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
 
@@ -1344,7 +1355,8 @@ class RegressionModels:
 
             else:
 
-                multCompAxs[self.targetFeature][index][self.regrN, columnNr ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr ].scatter(obs, pred, edgecolors=(0, 0, 0),  
+                        color=self.featureSymbolColor, alpha=self.featureSymbolAlpha,
                        s=self.paramD['regressionModelSymbols'][self.regrModel[0]]['size'],
                        marker=self.paramD['regressionModelSymbols'][self.regrModel[0]]['marker'])
 
