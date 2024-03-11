@@ -80,6 +80,7 @@ from scipy.stats import boxcox
 import pickle
 
 from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer
+from sklearn.decomposition import PCA
   
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.linear_model import BayesianRidge
@@ -282,6 +283,29 @@ def MLmodelParams():
     paramD['targetFeatureSymbols'] = {'caco3_usda.a54_w.pct':{'color': 'orange', 'size':50}}
 
     paramD['derivatives'] = {'apply':False, 'join':False}
+    
+    paramD['standardisation'] = {}
+    
+    paramD['tandardisation']['comment'] = "remove mean spectral signal and optionallay scale using standard deviation for each band"
+
+    paramD['standardisation']['apply'] = False
+    
+    paramD['standardisation']['meancentring'] = True
+    
+    paramD['standardisation']['unitscaling'] = False
+    
+    paramD['standardisation']['paretoscaling'] = False
+    
+    paramD['standardisation']['poissonscaling'] = False
+    
+    paramD['pcaPreproc'] = {}
+    
+    paramD['pcaPreproc']['comment'] = "remove mean spectral signal for each band"
+
+    paramD['pcaPreproc']['apply'] = False
+    
+    paramD['pcaPreproc']['n_components'] = 0
+
 
     paramD['removeOutliers'] = {}
 
@@ -2452,10 +2476,113 @@ class RegressionModels:
 
         #self.modelSelectD[name] = selectL
 
+    def _Standardisation(self):
+        """
+        """
+        
+        self.columnsX = [item for item in self.spectraDF.columns]
+
+        # extract the covariate columns as X
+        X = self.spectraDF[self.columnsX]
+        
+        scaler = StandardScaler().fit(X)
+        
+        arrayLength = scaler.var_.shape[0]
+
+        if self.standardisation.paretoscaling:
+            #  No meancentring, scales each variable by the square root of the standard deviation
+
+            # remove meancentring            
+            scaler.mean_ = np.zeros(arrayLength)
+                        
+            # set var_ to its own square root
+            scaler.var_ = np.sqrt(scaler.var_)
+            
+            # set scaling to the sqrt of the std
+            scaler.scale_ = np.sqrt(scaler.var_)
+            
+            X1 = scaler.transform(X)            
+                
+        elif self.standardisation.poissonscaling:
+            # No meancentring, scales each variable by the square root of the mean of the variable
+            
+            # remove meancentring            
+            scaler.mean_ = np.zeros(arrayLength)
+            
+            # Set var_ to mean_
+            scaler.var_ = scaler.mean_
+            # set scaler to sqrt of mean_ (var_)
+            scaler.scale_ = np.sqrt(scaler.var_)
+            
+            X1 = scaler.transform(X) 
+        
+        elif self.standardisation.meancentring:
+            
+            if self.standardisation.unitscaling:
+                
+                # This is a classical autoscaling or z-score normalisation
+                X1 = StandardScaler().fit_transform(X)
+                   
+            else:
+                
+                # This is meancentring
+                X1 = StandardScaler(with_std=False).fit_transform(X)
+        
+        # Reset the dataframe                
+        self.spectraDF = pd.DataFrame(data=X1, columns=self.columnsX)
+        
+    def _PcaPreprocess(self):
+        """ See https://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/tutorial/astronomy/dimensionality_reduction.html
+            for faster (random) algorithm
+        """ 
+        
+        self.columnsX = [item for item in self.spectraDF.columns]
+
+        # extract the covariate columns as X
+        X = self.spectraDF[self.columnsX]
+        
+        # set the new covariate columns:
+        
+        self.columnsX = []
+        
+        for i in range(self.pcaPreproc.n_components):
+            if i > 100:
+                x = 'pc-%s' %(i)
+            elif i > 10:
+                x = 'pc-0%s' %(i)
+            else:
+                x = 'pc-00%s' %(i) 
+                
+            self.columnsX.append(x)
+        
+        pca = PCA(n_components=self.pcaPreproc.n_components)
+
+        X_pc = pca.fit_transform(X)
+                
+        print(pca.components_)
+        
+        print(sum(pca.explained_variance_ratio_))
+        
+        print (self.columnsX)
+        print ('X')
+        print (X)
+        
+        print ('X_pc')
+        print (X_pc)
+        print (X_pc.shape)
+        
+        self.spectraDF = pd.DataFrame(data=X_pc, columns=self.columnsX)
+        
+        print (self.spectraDF)
+        
+
+                
+ 
+            
     def _RemoveOutliers(self):
         """
         """
-
+        
         if self.removeOutliers.contamination == 0:
             
             return
@@ -2681,6 +2808,8 @@ class RegressionModels:
 
             max_features_min = min(self.hyperParams.RandomTuning.RandForRegr.tuningParams.max_features.min,nFeatures)
 
+            print (self.hyperParams.RandomTuning.RandForRegr.tuningParams.n_estimators.min)
+            
             self.paramDist[name] = {"max_depth": max_depth,
                           "n_estimators": sp_randint(self.hyperParams.RandomTuning.RandForRegr.tuningParams.n_estimators.min,
                                                               self.hyperParams.RandomTuning.RandForRegr.tuningParams.n_estimators.max),
@@ -2690,7 +2819,7 @@ class RegressionModels:
                                                               self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_split.max),
                           "min_samples_leaf": sp_randint(self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_leaf.min,
                                                               self.hyperParams.RandomTuning.RandForRegr.tuningParams.min_samples_leaf.max),
-                          "bootstrap": self.hyperParams.RandomTuning.RandForRegr.bootstrap}
+                          "bootstrap": self.hyperParams.RandomTuning.RandForRegr.tuningParams.bootstrap}
 
         elif name =='MLP':
 
@@ -2807,7 +2936,7 @@ class RegressionModels:
 
         search = GridSearchCV(mod, param_grid=self.paramGrid[name])
 
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=(1-self.params.hyperParameterTuning))
+        X_train, X_test, y_train, y_test = model_selection.train_test_split(self.X, self.y, test_size=(1-self.params.hyperParameterTuning.fraction))
 
         search.fit(X_train, y_train)
 
@@ -3601,6 +3730,15 @@ class MachineLearningModel(Obj, RegressionModels):
         #self.summaryD['targetFeatures'] = self.transformD
 
         resultD['originalInputColumns'] = len(self.originalColumns)
+        
+            
+        if self.standardisation.apply:
+            
+            resultD['standardisation'] = True
+            
+        if self.pcaPreproc.apply:
+            
+            resultD['pcaPreproc'] = True
 
         if self.removeOutliers.apply or self.globalFeatureSelection.apply or self.featureAgglomeration.apply:
 
@@ -3839,6 +3977,17 @@ class MachineLearningModel(Obj, RegressionModels):
 
                         self.tunedHyperParamsD[targetFeature][regModel] = {}
 
+        
+        # standardisation can do both meancetnring or -score normalisation            
+        if self.standardisation.apply:
+            
+            self._Standardisation()
+            
+        # PCA preprocess            
+        if self.pcaPreproc.apply:
+            
+            self._PcaPreprocess()
+        
         # RemoveOutliers is applied to the full dataset and affects all models
         if self.removeOutliers.apply:
 
@@ -4098,7 +4247,7 @@ def SetupProcesses(iniParams):
                             'modelFeatureSelection','featureAgglomeration',
                             'hyperParameterTuning']'''
             
-            processStepL = ['removeOutliers', 
+            processStepL = ['standardisation','removeOutliers', 
                             'globalFeatureSelection','targetFeatureSelection',
                             'modelFeatureSelection','featureAgglomeration',
                             'hyperParameterTuning']
@@ -4216,9 +4365,12 @@ if __name__ == '__main__':
     #rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_theodor_error.json'
     
     rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_tar-feat-pretransform_comp.json'
-    '''
+    
     rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_AMS-sensors-wls.json'
+    '''
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/hyper_model-OSSL-LUCAS-SE_600-870_54.json'
 
+    rootJsonFPN = '/Users/thomasgumbricht/docs-local/OSSL2/projects_model/model_ossl_meancentring.json'
     
     iniParams = ReadAnyJson(rootJsonFPN)
             
