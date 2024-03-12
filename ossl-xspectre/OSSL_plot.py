@@ -62,6 +62,8 @@ import matplotlib.pyplot as plt
 from math import ceil, floor
 
 from sklearn.preprocessing import PowerTransformer
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import normalize
 
 # from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer
 
@@ -199,7 +201,7 @@ def PlotParams():
                    'supTitle': 'auto',
                    'tightLayout': True,
                    'singles': {'figSize': {'x': 8, 'y': 6}},
-                   'duals': {'figSize': {'x': 8, 'y': 8}},
+                   'subfigs': {'figSize': {'x': 8, 'y': 8}},
                    'xLim': {'xMax': 1045, 'xMin': 465},
                    'raw': { 'apply': True,
                             'axisLabel': { 'x': 'Wavelength (nm)',
@@ -389,7 +391,7 @@ def ReadImportParamsJson(jsonFPN):
 
     return ReadAnyJson(jsonFPN)
 
-def ReadProjectFile(rootFP, dstRootFP,projFN, jsonFP):
+def ReadProjectFileOLD(rootFP, dstRootFP,projFN, jsonFP):
     '''
     '''
     projFPN = os.path.join(dstRootFP,projFN)
@@ -413,6 +415,34 @@ def ReadProjectFile(rootFP, dstRootFP,projFN, jsonFP):
     jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonL if len(x) > 10 and x[0] != '#']
 
     return jsonProcessObjectL
+
+def ReadProjectFile(dstRootFP,projFN):
+
+    projFPN = os.path.join(dstRootFP,projFN)
+
+    if not os.path.exists(projFPN):
+
+        exitstr = 'EXITING, project file missing: %s.' %(projFPN)
+
+        exit( exitstr )
+
+    infostr = 'Processing %s' %(projFPN)
+
+    print (infostr)
+
+    '''
+    # Open and read the text file linking to all json files defining the project
+    with open(projFPN) as f:
+
+        jsonL = f.readlines()
+    
+    # Clean the list of json objects from comments and whithespace etc
+    jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonL if len(x) > 10 and x[0] != '#']
+    '''
+    
+    jsonProcessObjectD = ReadAnyJson(projFPN)
+
+    return jsonProcessObjectD
 
 def ReadPlotJson(jsonFPN):
     """ Read the parameters for plotting
@@ -450,6 +480,159 @@ def LoadBandData(columns, SpectraD):
 
     return pd.DataFrame(data=spectraA, columns=columns)
 
+
+def snv(input_data):
+    ''' Perform Multiplicative scatter correction
+    copied 20240311: https://nirpyresearch.com/two-scatter-correction-techniques-nir-spectroscopy-python/
+    '''
+  
+    # Define a new array and populate it with the corrected data  
+    output_data = np.zeros_like(input_data)
+    
+    for i in range(input_data.shape[0]):
+ 
+        # Apply correction
+        output_data[i,:] = (input_data[i,:] - np.mean(input_data[i,:])) / np.std(input_data[i,:])
+ 
+    return output_data
+
+def msc(input_data, reference=None):
+    ''' Perform Multiplicative scatter correction
+    copied 20240311: https://nirpyresearch.com/two-scatter-correction-techniques-nir-spectroscopy-python/
+    '''
+ 
+    # mean centre correction
+    
+    for i in range(input_data.shape[0]):
+        
+        input_data[i,:] -= input_data[i,:].mean()
+ 
+    # Get the reference spectrum. If not given, estimate it from the mean    
+    if reference is None:    
+        # Calculate mean
+        ref = np.mean(input_data, axis=0)
+    else:
+        ref = reference
+ 
+    # Define a new array and populate it with the corrected data    
+    data_msc = np.zeros_like(input_data)
+    for i in range(input_data.shape[0]):
+        # Run regression
+        fit = np.polyfit(ref, input_data[i,:], 1, full=True)
+        # Apply correction
+        data_msc[i,:] = (input_data[i,:] - fit[0][1]) / fit[0][0] 
+ 
+    return (data_msc, ref)
+
+
+def PlotScatterCorrectionFromDf(dataFrame, scattercorrplot, columns):
+    """ Scatter correction for spectral signals
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    
+    normD = {}
+    
+    scatcorrDFD = {}
+    
+    normD['l1'] = { 'norm':'l1', 'label':'L1 norm'}
+    normD['l2'] = {'norm':'l2', 'label':'L2 norm'}
+    normD['max'] = {'norm':'max', 'label':'max norm'}
+    normD['snv'] = {'norm':'max', 'label':'SNV'}
+    normD['msc'] = {'norm':'max', 'label':'MSC'}
+    
+    if hasattr(scattercorrplot, 'plotrawspectra') and scattercorrplot.plotrawspectra:
+        
+        scatcorrDFD['raw'] = {'label': 'raw spectra'}
+        
+        scatcorrDFD['raw']['DF'] = dataFrame
+        
+    for scatcorr in scattercorrplot.singles:
+        
+        scatcorrDFD[scatcorr] = {'label': normD[scatcorr]['label']}
+        
+        if scatcorr in ['l1','l2','max']:
+            
+            X1 = normalize(dataFrame, norm=scatcorr) 
+        
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
+            
+        elif scatcorr == 'snv':
+            
+            X = np.array(dataFrame[columns])
+            
+            snvSpectra = snv(X)
+            
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=snvSpectra, columns=columns)
+        
+        elif scatcorr == 'msc':
+            
+            #X = dataFrame[columns]
+            X = np.array(dataFrame[columns])
+            
+            mscSpectra, meanSpectra = msc(X)
+            
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=mscSpectra, columns=columns)
+            
+    for d in scattercorrplot.duals:
+        
+        scatcorr = '%s+%s' %(d[0],d[1])
+        
+        label = '%s + %s' %(normD[d[0]]['label'], normD[d[1]]['label'])
+        
+        scatcorrDFD[scatcorr] = {'label': label}
+        
+        dualCorrDF = deepcopy(dataFrame)
+        
+        for i in range(2):
+            
+            corrector = d[i] 
+             
+            if corrector in ['l1','l2','max']:
+                
+                X = np.array(dualCorrDF[columns])
+                
+                X1 = normalize(X, norm=corrector) 
+                
+                dualCorrDF = pd.DataFrame(data=X1, columns=columns)
+              
+            elif corrector == 'snv':
+                
+                X = np.array(dualCorrDF[columns])
+                
+                snvSpectra = snv(X)
+                
+                dualCorrDF = pd.DataFrame(data=snvSpectra, columns=columns)
+            
+            elif scatcorr == 'msc':
+                
+                #X = dataFrame[columns]
+                X = np.array(dualCorrDF[columns])
+                
+                mscSpectra, meanSpectra = msc(X)
+                
+                dualCorrDF = pd.DataFrame(data=mscSpectra, columns=columns)
+                
+        scatcorrDFD[scatcorr]['DF'] = dualCorrDF
+            
+    return scatcorrDFD
+                      
+
+def SpectraScatterCorrectionFromDf(dataFrame,scattercorrection, columns):
+    """ Scatter correction for spectral signals
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    
+    
+    dataFrameD = PlotScatterCorrectionFromDf(dataFrame, scattercorrection, columns)
+    
+    key = next(iter(dataFrameD))
+        
+    return dataFrameD[key]['DF'], key
+    
 def SpectraDerivativeFromDf(dataFrame,columns):
     """ Create 1st order derivates from spectral signals
 
@@ -473,6 +656,87 @@ def SpectraDerivativeFromDf(dataFrame,columns):
     spectraDerivativeDF.columns = derivativeColumns
 
     return spectraDerivativeDF, derivativeColumns
+
+def SpectraMeanCentringFromDf(dataFrame,columns):
+    """ Meancentring of the raw spectral data
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+
+    # Get the meancrentred spectral data
+    
+    meanCentringSpectra = StandardScaler(with_std=False).fit_transform(dataFrame)
+    
+    spectraMeanCentringeDF = pd.DataFrame(data=meanCentringSpectra, columns=columns)
+    
+    return spectraMeanCentringeDF, columns
+
+def SpectraAutoScalingFromDf(dataFrame,columns):
+    """ Autoscaling of the raw spectral data
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+
+    # Get the meancrentred spectral data
+    
+    autoScalingSpectra = StandardScaler().fit_transform(dataFrame)
+    
+    spectraAutoScalingDF = pd.DataFrame(data=autoScalingSpectra, columns=columns)
+    
+    return spectraAutoScalingDF, columns
+
+def SpectraParetoScalingFromDf(dataFrame,columns):
+    """ Pareto caling of the raw spectral data
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    scaler = StandardScaler().fit(dataFrame)
+        
+    arrayLength = scaler.var_.shape[0]
+        
+    # remove meancentring            
+    scaler.mean_ = np.zeros(arrayLength)
+                
+    # set var_ to its own square root
+    scaler.var_ = np.sqrt(scaler.var_)
+    
+    # set scaling to the sqrt of the std
+    scaler.scale_ = np.sqrt(scaler.var_)
+    
+    X1 = scaler.transform(dataFrame)            
+            
+    spectraParetoScalingDF = pd.DataFrame(data=X1, columns=columns)
+    
+    return spectraParetoScalingDF, columns
+
+def SpectraPoissonScalingFromDf(dataFrame,columns):
+    """ Poisson scaling of the raw spectral data
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    scaler = StandardScaler(with_mean=False).fit(dataFrame)
+        
+    #arrayLength = scaler.var_.shape[0]
+        
+    # remove meancentring            
+    #scaler.mean_ = np.zeros(arrayLength)
+
+    # Set var_ to mean_
+    scaler.var_ = scaler.mean_
+    
+    # set scaler to sqrt of mean_ (var_)
+    scaler.scale_ = np.sqrt(scaler.var_)
+    
+    X1 = scaler.transform(dataFrame)            
+            
+    spectraPoissonScalingDF = pd.DataFrame(data=X1, columns=columns)
+    
+    return spectraPoissonScalingDF, columns
+
 
 class Obj(object):
     ''' Convert json parameters to class objects
@@ -523,22 +787,22 @@ class Obj(object):
         ''' Set class object default data if required
         '''
 
-        if self.spectraPlot.singles.figSize.x == 0:
+        if self.spectraPlot.singlefigs.figSize.x == 0:
 
-            self.spectraPlot.singles.figSize.x = 8
+            self.spectraPlot.singlefigs.figSize.x = 8
 
-        if self.spectraPlot.singles.figSize.y == 0:
+        if self.spectraPlot.singlefigs.figSize.y == 0:
 
-            self.spectraPlot.singles.figSize.y = 6
+            self.spectraPlot.singlefigs.figSize.y = 6
 
 
-        if self.spectraPlot.duals.figSize.x == 0:
+        if self.spectraPlot.subfigs.figSize.x == 0:
 
-            self.spectraPlot.duals.figSize.x = 8
+            self.spectraPlot.subfigs.figSize.x = 8
 
-        if self.spectraPlot.duals.figSize.y == 0:
+        if self.spectraPlot.subfigs.figSize.y == 0:
 
-            self.spectraPlot.duals.figSize.y = 8
+            self.spectraPlot.subfigs.figSize.y = 8
 
         if len(self.featurePlot.targetFeatures) < self.featurePlot.columns.ncolumns:
 
@@ -708,11 +972,62 @@ class SpectraPlot(Obj):
         ''' Read json data into numpy array and convert to pandas dataframe
         '''
 
-        self.SpectraDF = LoadBandData(self.columns, self.jsonSpectraData)
+        #'rawspectra','derivatives','meancentring','autoscaling','paretoscaling','poissonscaling'
+        self.rawspectraDF = LoadBandData(self.columns, self.jsonSpectraData)
+        
+        # The more comprehensive scattercorrection tests
+        if self.scattercorrectionPlot.apply:
+            
+            self._PlotScatterCorrections(self.scatterCorrMultiFPN)
 
+
+        # The sequence of preprocessing                      
         if self.spectraPlot.derivatives.apply:
 
-            self.spectraDerivativeDF,self.derivativeColumns = SpectraDerivativeFromDf(self.SpectraDF,self.columns)
+            self.derivativesDF,skip = SpectraDerivativeFromDf(self.rawspectraDF,self.columns)
+
+                    
+        if self.spectraPlot.scattercorrection.apply:
+            
+            self.scattercorrectionDF, self.scattercorrectionLabel = SpectraScatterCorrectionFromDf(self.rawspectraDF,self.spectraPlot.scattercorrection, self.columns)
+
+            if self.spectraPlot.meancentring.apply:
+                
+                self.meancentringDF,skip = SpectraMeanCentringFromDf(self.scattercorrectionDF,self.columns)
+            
+            if self.spectraPlot.autoscaling.apply:
+                
+                self.autoscalingDF,skip = SpectraAutoScalingFromDf(self.scattercorrectionDF,self.columns)
+            
+            if self.spectraPlot.paretoscaling.apply:
+                
+                self.paretoscalingDF,skip = SpectraParetoScalingFromDf(self.scattercorrectionDF,self.columns)
+            
+            if self.spectraPlot.poissonscaling.apply:
+                
+                self.poissonscalingDF,skip = SpectraPoissonScalingFromDf(self.scattercorrectionDF,self.columns)
+        
+        else:
+            
+            if self.spectraPlot.meancentring.apply:
+                
+                self.meancentringDF,skip = SpectraMeanCentringFromDf(self.rawspectraDF,self.columns)
+            
+            if self.spectraPlot.autoscaling.apply:
+                
+                self.autoscalingDF,skip = SpectraAutoScalingFromDf(self.rawspectraDF,self.columns)
+            
+            if self.spectraPlot.paretoscaling.apply:
+                
+                self.paretoscalingDF,skip = SpectraParetoScalingFromDf(self.rawspectraDF,self.columns)
+            
+            if self.spectraPlot.poissonscaling.apply:
+                
+                self.poissonscalingDF,skip = SpectraPoissonScalingFromDf(self.rawspectraDF,self.columns)
+
+        if self.spectraPlot.pcaPreproc.apply:
+            
+            pass
 
     def _SetDstFPNs(self):
         ''' Set destination file paths and names
@@ -729,6 +1044,14 @@ class SpectraPlot(Obj):
         if not os.path.exists(plotRootFP):
 
             os.makedirs(plotRootFP)
+            
+        scatterCorrMultiPngFN = 'scattercorr_all.png'
+        
+        self.scatterCorrMultiFPN = os.path.join(plotRootFP, scatterCorrMultiPngFN)
+        
+        scatterCorrSingelBaseFN = 'scattercorr_'
+        
+        self.scatterCorrSingelBaseFPN = os.path.join(plotRootFP, scatterCorrSingelBaseFN)
 
         rawPngFN = 'spectra.png'
 
@@ -848,9 +1171,7 @@ class SpectraPlot(Obj):
                     print ('data',self.abundanceDf[column])
                     
                     pt.fit(np.atleast_2d(self.abundanceDf[column]))
-                    
-         
-                    
+                                     
                     print('lambdas',pt.lambdas_)
                     
                     print(pt.transform( np.atleast_2d(self.abundanceDf[column]) ) )
@@ -955,9 +1276,7 @@ class SpectraPlot(Obj):
 
             for feature in self.featurePlot.targetFeatures:
                 
-                print (feature)
-                    
-                    
+                print (feature)   
 
                 row = floor(f / self.featurePlot.columns.ncolumns)
 
@@ -1010,9 +1329,7 @@ class SpectraPlot(Obj):
         """
 
         if self.featurePlot.singles.apply:
-            
-            BALLE
-            
+                        
             for feature in self.featurePlot.targetFeatures:
     
                 tarFeat = getattr(self.targetFeatureSymbols, feature)
@@ -1091,6 +1408,153 @@ class SpectraPlot(Obj):
 
                 featureFig.savefig(self.boxwhiskersPlotFPN)   # save the figure to file
 
+    def _PlotScatterCorrections(self, pngFPN):
+        """
+        """
+                 
+        subplotsD = PlotScatterCorrectionFromDf(self.rawspectraDF,self.scattercorrectionPlot,self.columns)
+       
+        if len(subplotsD) == 0:
+            
+            return 
+        
+        # Get the bands to plot
+        plotskipStep = ceil( (len(self.rawspectraDF.index)-1)/self.scattercorrectionPlot.maxSpectra )
+
+        if len(subplotsD) > 1:
+                        
+            fig, ax = plt.subplots(nrows=len(subplotsD), ncols=1, figsize=(self.scattercorrectionPlot.subfigs.figSize.x, self.scattercorrectionPlot.subfigs.figSize.y), sharex=True  )
+            
+        n = int(len(self.rawspectraDF.index)/plotskipStep)+1
+
+        # With n bands known, create the colorRamp
+        self._SetcolorRamp(n)
+        
+        x_spectra_integers = [int(i) for i in self.columns]
+        
+        # Set the supTitle from start - to use in single fig if requested
+        if self.scattercorrectionPlot.supTitle:
+           
+            if self.scattercorrectionPlot.supTitle == "auto":
+
+                supTitle = 'Comparison of Scatter correction methods, %s' %(self.name)
+                
+            else:
+
+                supTitle = self.scattercorrectionPlot.supTitle
+        
+        # Iterate over the subplots in subplotsD
+        for x,subplotkey in enumerate(subplotsD):
+            
+            if self.scattercorrectionPlot.singlefigs.apply:
+                
+                singlefig, singleax = plt.subplots(nrows=1, ncols=1, figsize=(self.scattercorrectionPlot.singlefigs.figSize.x, self.scattercorrectionPlot.singlefigs.figSize.y), sharex=True  )
+      
+            i = -1
+
+            n = 0
+                        
+            DF = subplotsD[subplotkey]['DF']
+    
+            for index, row in DF.iterrows():
+    
+                i += 1
+    
+                if i % plotskipStep == 0:
+                        
+                    if len(subplotsD) > 1:
+                                                
+                        ax[x].plot(x_spectra_integers, row, color=self.slicedCM[n])
+                        
+                    if self.scattercorrectionPlot.singlefigs.apply:
+                        
+                        singleax.plot(x_spectra_integers, row, color=self.slicedCM[n])
+                        
+                    n += 1
+            
+            xyLimD = {}; 
+            
+            if self.scattercorrectionPlot.xLim.xMin < self.scattercorrectionPlot.xLim.xMax:
+
+                if len(subplotsD) > 1:
+                                        
+                    ax[x].set_xlim(self.scattercorrectionPlot.xLim.xMin, self.scattercorrectionPlot.xLim.xMax)
+             
+                    xyLimD['xMin'],xyLimD['xMax'] = ax[x].get_xlim()
+    
+                    xyLimD['yMin'],xyLimD['yMax'] = ax[x].get_ylim()
+                    
+                if self.scattercorrectionPlot.singlefigs.apply:
+                        
+                    singleax.set_xlim(self.scattercorrectionPlot.xLim.xMin, self.scattercorrectionPlot.xLim.xMax)
+                    
+            if self.scattercorrectionPlot.labelastitle:
+                
+                if len(subplotsD) > 1:
+                    
+                    ax[x].set( title=subplotsD[subplotkey]['label'])
+                    
+                if self.scattercorrectionPlot.singlefigs.apply:
+                    
+                    singleax.set( title=subplotsD[subplotkey]['label'])
+                
+            else:
+                
+                xpos,ypos= self._SetPlotTextPos(self.scattercorrectionPlot, xyLimD['xMin'], xyLimD['xMax'], xyLimD['yMin'], xyLimD['yMax'])
+                
+                if len(subplotsD) > 1:
+                    
+                    ax[x].text(xpos, ypos, subplotsD[subplotkey]['label'])
+                    
+                if self.scattercorrectionPlot.singlefigs.apply:
+                    
+                    singleax.text(xpos, ypos, subplotsD[subplotkey]['label'])
+                    
+            if self.scattercorrectionPlot.singlefigs.apply:
+                
+                singleax.set(xlabel=self.scattercorrectionPlot.axisLabel.x)
+                
+                # Set tight layout if requested
+                if self.scattercorrectionPlot.singlefigs.tightLayout:
+                            
+                    singlefig.tight_layout()
+                
+                if self.scattercorrectionPlot.supTitle:
+                    
+                    singlefig.suptitle(supTitle)
+                    
+                singelPngFPN = '%s%s.png' %(self.scatterCorrSingelBaseFPN, subplotsD[subplotkey]['label'])
+                
+                singlefig.savefig(singelPngFPN)   # save the figure to file
+                
+                plt.close(singlefig)
+        
+        ax[x].set(xlabel=self.scattercorrectionPlot.axisLabel.x)
+                
+        # Set supTitle
+        if self.scattercorrectionPlot.supTitle:
+           
+            fig.suptitle(supTitle)
+             
+        # Set tight layout if requested
+        if self.scattercorrectionPlot.subfigs.tightLayout:
+
+            fig.tight_layout()
+            
+        if self.scattercorrectionPlot.screenDraw:
+  
+            plt.show()
+
+        if self.spectraPlot.savePng:
+
+            fig.savefig(pngFPN)   # save the figure to file
+            
+            infostr = 'Scatter correctionp plot saved as:‰n    %s' %(pngFPN)
+            
+            print(infostr)
+        
+        plt.close(fig)
+              
     def _PlotMonoMulti(self, dataframe, x, plot, pngFPN):
         ''' Single subplot for multiple bands
 
@@ -1113,7 +1577,7 @@ class SpectraPlot(Obj):
         '''
 
         # Get the bands to plot
-        plotskipStep = ceil( (len(self.SpectraDF.index)-1)/self.spectraPlot.maxSpectra )
+        plotskipStep = ceil( (len(self.rawspectraDF.index)-1)/self.spectraPlot.maxSpectra )
 
         xLabel = plot.axisLabel.x
 
@@ -1124,7 +1588,7 @@ class SpectraPlot(Obj):
 
         fig, ax = plt.subplots( figsize=(self.spectraPlot.figSize.x, self.spectraPlot.figSize.y)  )
 
-        n = int(len(self.SpectraDF.index)/plotskipStep)+1
+        n = int(len(self.rawspectraDF.index)/plotskipStep)+1
 
         # With n bands known, create the colorRamp
         self._SetcolorRamp(n)
@@ -1186,7 +1650,7 @@ class SpectraPlot(Obj):
 
         plt.close(fig)
 
-    def _PlotDualMulti(self,pngFPN):
+    def _PlotSubFigs(self,pngFPN, subplotsD):
         ''' Single subplot for multiple bands
 
             :param str xlabel: x-axis label
@@ -1208,107 +1672,151 @@ class SpectraPlot(Obj):
         '''
 
         # Get the bands to plot
-        plotskipStep = ceil( (len(self.SpectraDF.index)-1)/self.spectraPlot.maxSpectra )
+        plotskipStep = ceil( (len(self.rawspectraDF.index)-1)/self.spectraPlot.maxSpectra )
 
-        fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(self.spectraPlot.duals.figSize.x, self.spectraPlot.duals.figSize.y), sharex=True  )
+        fig, ax = plt.subplots(nrows=len(subplotsD), ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
 
-        n = int(len(self.SpectraDF.index)/plotskipStep)+1
+        n = int(len(self.rawspectraDF.index)/plotskipStep)+1
 
         # With n bands known, create the colorRamp
         self._SetcolorRamp(n)
+        
+        x_spectra_integers = [int(i) for i in self.columns]
+        
+        if 'derivatives' in subplotsD:
+            
+            xd = list(self.derivativesDF.columns.values)
+            
+            x_derivative_integers = [int(i[1:len(i)]) for i in xd]
+            
 
-        xraw = [int(i) for i in self.columns]
-
-        xderivative = [int(i[1:len(i)]) for i in self.derivativeColumns]
-
-        # Loop over the spectra
-        i = -1
-        n = 0
-        for index, row in self.SpectraDF.iterrows():
-
-            i += 1
-
-            if i % plotskipStep == 0:
-
-                ax[0].plot(xraw, row, color=self.slicedCM[n])
-
-                n += 1
-
-        # Loop over the derivatives
-        i = -1
-
-        n = 0
-
-        for index, row in self.spectraDerivativeDF.iterrows():
-
-            i += 1
-
-            if i % plotskipStep == 0:
-
-                ax[1].plot(xderivative, row, color=self.slicedCM[n])
-
-                n += 1
-
-        if self.spectraPlot.xLim.xMin:
-
-            ax[0].set_xlim(self.spectraPlot.xLim.xMin, self.spectraPlot.xLim.xMax)
-
-            ax[1].set_xlim(self.spectraPlot.xLim.xMin, self.spectraPlot.xLim.xMax)
-
-        if self.spectraPlot.raw.yLim.yMin:
-
-            ax[0].set_ylim(self.spectraPlot.raw.yLim.yMin,self.spectraPlot.raw.yLim.yMax)
-
-        if self.spectraPlot.derivatives.yLim.yMin:
-
-            ax[1].set_ylim(self.spectraPlot.derivatives.yLim.yMin, self.spectraPlot.derivatives.yLim.yMax)
-
-        # Get the limits of the plot areas - to fit the text
-        rawxyLimD = {}; derivativexyLimD = {}
-
-        rawxyLimD['xMin'],rawxyLimD['xMax'] = ax[0].get_xlim()
-
-        rawxyLimD['yMin'],rawxyLimD['yMax'] = ax[0].get_ylim()
-
-        derivativexyLimD['xMin'],derivativexyLimD['xMax'] = ax[1].get_xlim()
-
-        derivativexyLimD['yMin'],derivativexyLimD['yMax'] = ax[1].get_ylim()
-
-        ax[0].set(ylabel=self.spectraPlot.raw.axisLabel.y, title=self.spectraPlot.raw.title.title)
-
-        ax[1].set(xlabel=self.spectraPlot.raw.axisLabel.x, ylabel=self.spectraPlot.derivatives.axisLabel.y,
-                  title=self.spectraPlot.derivatives.title.title)
-
-        if self.spectraPlot.legend:
-
-            ax[0].legend(loc=self.spectraPlot.legend)
-
-        rawtext = self._PlotTitleText(self.spectraPlot.raw,plotskipStep)[1]
-
-        if self.spectraPlot.raw.text != None:
-
-            x,y = self._SetPlotTextPos(self.spectraPlot.raw, rawxyLimD['xMin'], rawxyLimD['xMax'], rawxyLimD['yMin'], rawxyLimD['yMax'])
-
-            ax[0].text(x, y, rawtext)
-
-        derivativetext = self._PlotTitleText(self.spectraPlot.derivatives,0)[1]
-
-        if self.spectraPlot.derivatives.text != None:
-
-            x,y = self._SetPlotTextPos(self.spectraPlot.derivatives, derivativexyLimD['xMin'], derivativexyLimD['xMax'], derivativexyLimD['yMin'], derivativexyLimD['yMax'])
-
-            ax[1].text(x, y, derivativetext)
-
-        # Set supTitle
         if self.spectraPlot.supTitle:
-
+           
             if self.spectraPlot.supTitle == "auto":
 
-                supTitle = 'Project: %s' %(self.name)
-
+                supTitle = 'Pre-processing for, %s' %(self.name)
+                
             else:
 
                 supTitle = self.spectraPlot.supTitle
+        
+            
+        xMin, xMax = self.spectraPlot.xLim.xMin, self.spectraPlot.xLim.xMax
+        
+        for x,subplotkey in enumerate(subplotsD):
+                        
+            # Loop over the spectra
+            i = -1
+
+            n = 0
+            
+            DFname = '%sDF' %(subplotkey)
+            
+            DF = getattr(self,DFname)
+            
+            
+            for index, row in DF.iterrows():
+    
+                i += 1
+    
+                if i % plotskipStep == 0:
+                    
+                    if subplotkey in ['derivates']:
+                        
+                        ax[x].plot(x_derivative_integers, row, color=self.slicedCM[n])
+                        
+                    else:
+                        
+                        ax[x].plot(x_spectra_integers, row, color=self.slicedCM[n])
+    
+                    n += 1
+                    
+
+            if xMin < xMax:
+
+                if len(subplotsD) > 1:
+                                        
+                    ax[x].set_xlim(xMin, xMax)
+                 
+                if self.spectraPlot.singlefigs.apply:
+                    
+                    pass    
+                    #singleax.set_xlim(self.scattercorrectionPlot.xLim.xMin, self.scattercorrectionPlot.xLim.xMax)
+                       
+            if subplotsD[subplotkey].title.title:
+                
+                if len(subplotsD) > 1:
+                    
+                    ax[x].set( title=subplotsD[subplotkey].title.title)
+                    
+                if self.spectraPlot.singlefigs.apply:
+                    
+                    pass
+                    #singleax.set( title=subplotsD[subplotkey]['label'])
+                
+            xyLimD = {}
+                 
+            xyLimD['xMin'],xyLimD['xMax'] = ax[x].get_xlim()
+    
+            xyLimD['yMin'],xyLimD['yMax'] = ax[x].get_ylim()
+                
+            xpos,ypos= self._SetPlotTextPos(subplotsD[subplotkey], xyLimD['xMin'], xyLimD['xMax'], xyLimD['yMin'], xyLimD['yMax'])
+                
+            text = subplotsD[subplotkey].text.text
+            
+            if subplotkey == 'scattercorrection':
+                
+                text += '\nscaler(s): %s' %(self.scattercorrectionLabel)
+                        
+            if subplotsD[subplotkey].text.bandWidth:
+                
+                text += '\nbandwidth=%s nm' %( self.bandWidth )
+            
+            if subplotsD[subplotkey].text.samples:
+                
+                text += '\nnspectra=%s; nbands=%s' %( self.rawspectraDF.shape[0],len(self.columns))
+
+            
+            if subplotsD[subplotkey].text.skipStep:
+                
+                text += '\nshowing every %s spectra' %( plotskipStep )
+                
+            if len(subplotsD) > 1:
+                   
+                ax[x].text(xpos, ypos, text)
+                    
+                if self.spectraPlot.singlefigs.apply:
+                    
+                    pass
+                    #singleax.text(xpos, ypos, text)
+                    
+            if self.spectraPlot.singlefigs.apply:
+                
+                pass
+                #singleax.set(xlabel=self.scattercorrectionPlot.axisLabel.x)
+                
+                # Set tight layout if requested
+                if self.spectraPlot.singlefigs.tightLayout:
+                       
+                    pass     
+                    #singlefig.tight_layout()
+                
+                if self.spectraPlot.supTitle:
+                    
+                    pass
+                    #singlefig.suptitle(supTitle)
+                    
+                #singelPngFPN = '%s%s.png' %(self.spectraPlotBaseFPN, subplotsD[subplotkey]['label'])
+                
+                
+                #singlefig.savefig(singelPngFPN)   # save the figure to file
+                
+                #plt.close(singlefig)
+    
+        ax[x].set(xlabel=subplotsD[subplotkey].axisLabel.x)
+        
+        # Set supTitle
+        if self.spectraPlot.supTitle:
 
             fig.suptitle(supTitle)
 
@@ -1326,7 +1834,7 @@ class SpectraPlot(Obj):
             fig.savefig(pngFPN)   # save the figure to file
 
         plt.close(fig)
-
+        
     def _PlotTitleText(self, plot, plotskipStep):
         ''' Set plot title and annotation
 
@@ -1359,7 +1867,7 @@ class SpectraPlot(Obj):
         # Add number of samples to text
         if plot.text.samples:
 
-            text += '\nnspectra=%s; nbands=%s' %( self.SpectraDF.shape[0],len(self.columns))
+            text += '\nnspectra=%s; nbands=%s' %( self.rawspectraDF.shape[0],len(self.columns))
 
         if plot.text.skipStep and plotskipStep:
 
@@ -1387,12 +1895,29 @@ class SpectraPlot(Obj):
 
             # Get the band data
             self._GetBandData()
+            
+            # Assemble the nr of subplots
+            
+            subplotsD = {}
+            
+            subplotItems = ['rawspectra','derivatives','scattercorrection','meancentring','autoscaling','paretoscaling','poissonscaling']
+            
+            for s in subplotItems:
+                
+                itemattribute = getattr(self.spectraPlot, s)
+                
+                if getattr(itemattribute, 'apply' ):
+                    
+                    subplotsD[s] = itemattribute
+                    
+            if len(subplotsD) > 1:
+                
+                self._PlotSubFigs(self.dualPngFPN,subplotsD )
 
             # plot the spectra
-            if self.spectraPlot.raw.apply and self.spectraPlot.derivatives.apply:
+            #if self.spectraPlot.raw.apply and self.spectraPlot.derivatives.apply:
 
-                self._PlotDualMulti(self.dualPngFPN )
-
+                
             elif self.spectraPlot.derivatives.apply:
 
                 x = [int(i[1:len(i)]) for i in self.derivativeColumns]
@@ -1403,7 +1928,7 @@ class SpectraPlot(Obj):
 
                 x = [int(i) for i in self.columns]
 
-                self._PlotMonoMulti(self.SpectraDF, x, self.spectraPlot.raw, self.rawPngFPN )
+                self._PlotMonoMulti(self.rawspectraDF, x, self.spectraPlot.raw, self.rawPngFPN )
 
         if len(self.featurePlot.targetFeatures) > 0 and (self.featurePlot.histogram or self.featurePlot.boxWhisker):
 
@@ -1434,7 +1959,6 @@ def SetupProcesses(iniParams):
 
     :param jsonfolder: folder name
     :type: str
-
     '''
 
     dstRootFP, jsonFP = CheckMakeDocPaths(iniParams['rootpath'],
@@ -1445,15 +1969,18 @@ def SetupProcesses(iniParams):
     if iniParams['createjsonparams']:
 
         CreateArrangeParamJson(jsonFP,iniParams['projFN'],'plot')
+    jsonProcessObjectD = ReadProjectFile(dstRootFP, iniParams['projFN'])
+       
+    #jsonProcessObjectL = jsonProcessObjectD['projectFiles']
+    jsonProcessObjectL = [os.path.join(jsonFP,x.strip())  for x in jsonProcessObjectD['projectFiles'] if len(x) > 10 and x[0] != '#']
 
-    jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
-
+    #jsonProcessObjectL = ReadProjectFile(iniParams['rootpath'], dstRootFP, iniParams['projFN'], jsonFP)
 
     # Get the target Feature Symbols
     targetFeatureSymbolsD = ReadAnyJson(iniParams['targetfeaturesymbols'])
     
     # Get the target feature transform
-    targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])
+    # targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])
             
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
@@ -1462,12 +1989,43 @@ def SetupProcesses(iniParams):
 
         paramD = ReadPlotJson(jsonObj)
         
+        pp = pprint.PrettyPrinter(indent=2)
+
+        pp.pprint(paramD)
+        
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
-                
+        
+        
+        # Get the target feature transform
+        targetFeatureTransformD = ReadAnyJson(paramD['input']['targetfeaturetransforms'])
+        #targetFeatureTransformD = ReadAnyJson(iniParams['targetfeaturetransforms'])       
         # Add the targetFeatureTransforms
         paramD['targetFeatureTransform'] = targetFeatureTransformD['targetFeatureTransform']
 
+        if paramD['spectraPlot']['scattercorrection']['apply']:
+            
+            print (paramD['spectraPlot']['scattercorrection']['scaler'])
+                    
+            if len(paramD['spectraPlot']['scattercorrection']['scaler']) == 0:
+            
+                paramD['spectraPlot']['scattercorrection']['apply'] = False
+        
+            elif len(paramD['spectraPlot']['scattercorrection']['scaler']) == 1:
+                
+                paramD['spectraPlot']['scattercorrection']['singles'] = \
+                    paramD['spectraPlot']['scattercorrection']['scaler']
+                    
+                paramD['spectraPlot']['scattercorrection']['duals'] = []
+                
+            else:
+                
+                paramD['spectraPlot']['scattercorrection']['singles'] = []
+      
+                paramD['spectraPlot']['scattercorrection']['duals'] = \
+                    paramD['spectraPlot']['scattercorrection']['scaler']
+ 
+        
         '''
         pp = pprint.PrettyPrinter(indent=2)
 
@@ -1503,8 +2061,26 @@ if __name__ == '__main__':
     
     rootJsonFPN = "/Local/path/to/plot_ossl.json"
     '''
-    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/plot_ossl.json"
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/projects_plot/plot_ossl.json"
+    
+    rootJsonFPN = "/Users/thomasgumbricht/docs-local/OSSL2/projects_plot/plot_ossl.json"
+    
+    
+
     
     iniParams = ReadAnyJson(rootJsonFPN)
+            
+if type( iniParams['projFN']) is list: 
+          
+        for proj in iniParams['projFN']:
+            
+            projParams = deepcopy(iniParams)
+            
+            projParams['projFN'] = proj
+            
+            SetupProcesses(projParams)
+           
 
+else:
+        
     SetupProcesses(iniParams)
