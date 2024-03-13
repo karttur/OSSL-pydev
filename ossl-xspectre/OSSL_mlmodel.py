@@ -79,7 +79,7 @@ from scipy.stats import boxcox
 
 import pickle
 
-from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer
+from sklearn.preprocessing import scale, StandardScaler, QuantileTransformer, PowerTransformer, normalize
 from sklearn.decomposition import PCA
   
 from sklearn.cluster import FeatureAgglomeration
@@ -284,9 +284,17 @@ def MLmodelParams():
 
     paramD['derivatives'] = {'apply':False, 'join':False}
     
+    paramD['scattercorrection'] = {}
+    
+    paramD['scattercorrection']['comment'] = "scattercorr can apply the following: norm-1 (l1), norm-2 (l2) norm-max (max), snv (snv) or msc (msc). If two are gicen they will be done in series using output from the first as input to the second"
+
+    paramD['scattercorrection']['apply'] = False
+    
+    paramD['scattercorrection']['scaler'] = []
+    
     paramD['standardisation'] = {}
     
-    paramD['tandardisation']['comment'] = "remove mean spectral signal and optionallay scale using standard deviation for each band"
+    paramD['standardisation']['comment'] = "remove mean spectral signal and optionallay scale using standard deviation for each band"
 
     paramD['standardisation']['apply'] = False
     
@@ -752,6 +760,154 @@ def ReadProjectFile(dstRootFP,projFN):
 
     return jsonProcessObjectD
 
+
+def snv(input_data):
+    ''' Perform Multiplicative scatter correction
+    copied 20240311: https://nirpyresearch.com/two-scatter-correction-techniques-nir-spectroscopy-python/
+    '''
+  
+    # Define a new array and populate it with the corrected data  
+    output_data = np.zeros_like(input_data)
+    
+    for i in range(input_data.shape[0]):
+ 
+        # Apply correction
+        output_data[i,:] = (input_data[i,:] - np.mean(input_data[i,:])) / np.std(input_data[i,:])
+ 
+    return output_data
+
+def msc(input_data, reference=None):
+    ''' Perform Multiplicative scatter correction
+    copied 20240311: https://nirpyresearch.com/two-scatter-correction-techniques-nir-spectroscopy-python/
+    '''
+ 
+    # mean centre correction
+    
+    for i in range(input_data.shape[0]):
+        
+        input_data[i,:] -= input_data[i,:].mean()
+ 
+    # Get the reference spectrum. If not given, estimate it from the mean    
+    if reference is None:    
+        # Calculate mean
+        ref = np.mean(input_data, axis=0)
+    else:
+        ref = reference
+ 
+    # Define a new array and populate it with the corrected data    
+    data_msc = np.zeros_like(input_data)
+    for i in range(input_data.shape[0]):
+        # Run regression
+        fit = np.polyfit(ref, input_data[i,:], 1, full=True)
+        # Apply correction
+        data_msc[i,:] = (input_data[i,:] - fit[0][1]) / fit[0][0] 
+ 
+    return (data_msc, ref)
+
+def ScatterCorrectDF(dataFrame, scattercorrection, columns):
+    """ Scatter correction for spectral signals
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    
+    normD = {}
+    
+    scatcorrDFD = {}
+    
+    normD['l1'] = { 'norm':'l1', 'label':'L1 norm'}
+    normD['l2'] = {'norm':'l2', 'label':'L2 norm'}
+    normD['max'] = {'norm':'max', 'label':'max norm'}
+    normD['snv'] = {'norm':'max', 'label':'SNV'}
+    normD['msc'] = {'norm':'max', 'label':'MSC'}
+    
+    meanSpectra = None
+    
+    for scatcorr in scattercorrection.singles:
+        
+        scatcorrDFD[scatcorr] = {'label': normD[scatcorr]['label']}
+        
+        if scatcorr in ['l1','l2','max']:
+            
+            X1 = normalize(dataFrame, norm=scatcorr) 
+        
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
+            
+        elif scatcorr == 'snv':
+            
+            X = np.array(dataFrame[columns])
+            
+            snvSpectra = snv(X)
+            
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=snvSpectra, columns=columns)
+        
+        elif scatcorr == 'msc':
+            
+            #X = dataFrame[columns]
+            X = np.array(dataFrame[columns])
+            
+            mscSpectra, meanSpectra = msc(X)
+            
+            scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=mscSpectra, columns=columns)
+            
+    for d in scattercorrection.duals:
+        
+        scatcorr = '%s+%s' %(d[0],d[1])
+        
+        label = '%s + %s' %(normD[d[0]]['label'], normD[d[1]]['label'])
+        
+        scatcorrDFD[scatcorr] = {'label': label}
+        
+        dualCorrDF = deepcopy(dataFrame)
+        
+        for i in range(2):
+            
+            corrector = d[i] 
+             
+            if corrector in ['l1','l2','max']:
+                
+                X = np.array(dualCorrDF[columns])
+                
+                X1 = normalize(X, norm=corrector) 
+                
+                dualCorrDF = pd.DataFrame(data=X1, columns=columns)
+              
+            elif corrector == 'snv':
+                
+                X = np.array(dualCorrDF[columns])
+                
+                snvSpectra = snv(X)
+                
+                dualCorrDF = pd.DataFrame(data=snvSpectra, columns=columns)
+            
+            elif scatcorr == 'msc':
+                
+                #X = dataFrame[columns]
+                X = np.array(dualCorrDF[columns])
+                
+                mscSpectra, meanSpectra = msc(X)
+                
+                dualCorrDF = pd.DataFrame(data=mscSpectra, columns=columns)
+                
+        scatcorrDFD[scatcorr]['DF'] = dualCorrDF
+            
+    return scatcorrDFD, meanSpectra
+                      
+def SpectraScatterCorrectionFromDf(dataFrame,scattercorrection):
+    """ Scatter correction for spectral signals
+
+        :returns: organised spectral derivates
+        :rtype: pandas dataframe
+    """
+    
+    columns = [item for item in dataFrame]
+    
+    dataFrameD, scatCorrMeanSpectra = ScatterCorrectDF(dataFrame, scattercorrection, columns)
+    
+    key = next(iter(dataFrameD))
+
+    return dataFrameD[key]['DF'], key, scatCorrMeanSpectra
+
 def SetMultiCompDstFPNs(rootPath, arrangeDataPath, multiProjectComparisonD,targetFeatureSymbolsD):
     '''
     '''
@@ -957,6 +1113,8 @@ def SetMultCompPlots(multiProjectComparisonD,targetFeatureSymbolsD, figCols):
                     multCompAxs[targetFeature][index][0][c].set_title( trialId )
                                           
     return (multCompFig, multCompAxs, multCompPlotsColumnD)
+
+
 
 class Obj(object):
     ''' Convert json parameters to class objects
@@ -2506,8 +2664,7 @@ class RegressionModels:
         elif self.standardisation.poissonscaling:
             # No meancentring, scales each variable by the square root of the mean of the variable
             
-            # remove meancentring            
-            scaler.mean_ = np.zeros(arrayLength)
+            scaler = StandardScaler(with_mean=False).fit(X)
             
             # Set var_ to mean_
             scaler.var_ = scaler.mean_
@@ -2515,7 +2672,7 @@ class RegressionModels:
             scaler.scale_ = np.sqrt(scaler.var_)
             
             X1 = scaler.transform(X) 
-        
+            
         elif self.standardisation.meancentring:
             
             if self.standardisation.unitscaling:
@@ -3978,7 +4135,13 @@ class MachineLearningModel(Obj, RegressionModels):
                         self.tunedHyperParamsD[targetFeature][regModel] = {}
 
         
+        
         # standardisation can do both meancetnring or -score normalisation            
+        if self.scattercorrection.apply:
+       
+            self.spectraDF, self.scatCorrScaler, self.scaCcorrMeanSpectra = SpectraScatterCorrectionFromDf(self.spectraDF,self.scattercorrection)
+            
+        # standardisation can do both meancetnring or z-score normalisation            
         if self.standardisation.apply:
             
             self._Standardisation()
@@ -4210,7 +4373,10 @@ def SetupProcesses(iniParams):
             multCompSummaryD[targetFeature] = {}
             
         
+    
+        
     modelNr = 0    
+    
     #Loop over all json files
     for jsonObj in jsonProcessObjectL:
 
@@ -4218,6 +4384,26 @@ def SetupProcesses(iniParams):
 
         paramD = ReadModelJson(jsonObj)
         
+        if paramD['scattercorrection']['apply']:
+                       
+            if len(paramD['scattercorrection']['scaler']) == 0:
+            
+                paramD['scattercorrection']['apply'] = False
+        
+            elif len(paramD['scattercorrection']['scaler']) == 1:
+                
+                paramD['scattercorrection']['singles'] = \
+                    paramD['scattercorrection']['scaler']
+                    
+                paramD['scattercorrection']['duals'] = []
+                
+            else:
+                
+                paramD['scattercorrection']['singles'] = []
+      
+                paramD['scattercorrection']['duals'] = \
+                    paramD['scattercorrection']['scaler']
+                           
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
         
@@ -4384,7 +4570,6 @@ if type( iniParams['projFN']) is list:
             
             SetupProcesses(projParams)
            
-
 else:
         
     SetupProcesses(iniParams)
