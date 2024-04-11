@@ -885,7 +885,7 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             print ('X2',X2)
       
             print ('scatcorr',scatcorr)
-            BALLE
+
             '''
             X1 = np.array(trainDF[columns])
             
@@ -918,7 +918,7 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             print ('M2',M2)
       
             print ('scatcorr',scatcorr)
-            BALLE
+
             '''
             #X = dataFrame[columns]
             
@@ -3807,7 +3807,7 @@ class MachineLearningModel(Obj, RegressionModels):
                     
                     print (X)
                     
-                    BALLE
+    
                             
                 elif targetTransform.quantile:
                     
