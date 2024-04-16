@@ -4066,7 +4066,7 @@ class RegressionModels:
         
         plt.axis("square")
         
-        plt.legend(handles=handles, labels=["outliers", "inliers"], title="true class")
+        #plt.legend(handles=handles, labels=["outliers", "inliers"], title="true class")
         
         plt.title("Gaussian inliers with \nuniformly distributed outliers")
         
@@ -4151,14 +4151,21 @@ class RegressionModels:
     
             # select all rows that are not outliers
             
-            X['yhat'] = yhat
+            #X['yhat'] = yhat
 
             # Remove samples with outliers from the abundance array using the X array yhat columns
+            self.X_train = self.X_train[ yhat==1 ]
+            
             self.y_train = self.y_train[ yhat==1 ]
             
-            Xtrain = Xtrain[X['yhat']==1 ]
+            XtrainOutliers = self.X_train[ yhat==-1 ]
             
-            postTrainSamples = Xtrain.shape[0]
+            XtestOutliers = self.X_train[ yhat==-1 ]
+            
+            
+            #Xtrain = Xtrain[X['yhat']==1 ]
+            
+            postTrainSamples = self.X_train.shape[0]
                         
             # And now the test data
             # extract the covariate columns as X
@@ -4168,11 +4175,15 @@ class RegressionModels:
             
             yhat = outlierFit.predict(X)
             
-            X['yhat'] = yhat
+            #X['yhat'] = yhat
+            
+            
             
             self.y_test = self.y_test[ yhat==1 ]
             
-            Xtest = Xtest[X['yhat']==1 ]
+            self.X_test = self.y_test[ yhat==1 ]
+            
+            #Xtest = Xtest[X['yhat']==1 ]
             
             postTestSamples = Xtest.shape[0]
             
@@ -4201,8 +4212,12 @@ class RegressionModels:
             #X = X.drop("age", axis='columns')
             X = X.drop(columns=['yhat'])
          
-            print (plotX)
-            print (plotY)
+            #print (plotX)
+            #print (plotY)
+            print ('Xtrain')
+            print (Xtrain)
+            
+            SNULLE
             '''
             scatter = plt.scatter(plotX, plotY, s=20, edgecolor="k")
             handles, labels = scatter.legend_elements()
@@ -4229,7 +4244,9 @@ class RegressionModels:
             legend_lines.append(mlines.Line2D([], [], label=self.removeOutliers.detector.lower()))
             
             
-            ax.scatter(plotX, plotY, color="black")
+            ax.scatter(plotX, plotY, color="black", alpha=0.1)
+            ax.scatter(plotX, plotY, color="red", alpha=0.1)
+            
             bbox_args = dict(boxstyle="round", fc="0.8")
             arrow_args = dict(arrowstyle="->")
             ax.annotate(
