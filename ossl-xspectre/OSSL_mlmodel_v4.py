@@ -46,6 +46,7 @@ The module plot.py:
         "rootFP"#visnirjson#visnir_OSSL_"region"_"date"_"first wavelength"-"last wavelength"_"band width"_final-soillines.png
 
 '''
+from numpy import integer
 
 
 '''
@@ -66,7 +67,9 @@ from copy import deepcopy
 
 from math import sqrt
 
-#import pprint
+from time import sleep
+
+import pprint
 
 import csv
 
@@ -78,7 +81,6 @@ import numpy as np
 import pandas as pd
 
 import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
 
 from numbers import Integral, Real
 
@@ -133,153 +135,6 @@ from scipy.ndimage import gaussian_filter1d, convolve1d
 from scipy.signal import savgol_filter
 
 from cubist import Cubist
-
-def OutliersTest():
-    """
-    ====================================
-    Outlier detection on a real data set
-    ====================================
-    
-    This example illustrates the need for robust covariance estimation
-    on a real data set. It is useful both for outlier detection and for
-    a better understanding of the data structure.
-    
-    We selected two sets of two variables from the Wine data set
-    as an illustration of what kind of analysis can be done with several
-    outlier detection tools. For the purpose of visualization, we are working
-    with two-dimensional examples, but one should be aware that things are
-    not so trivial in high-dimension, as it will be pointed out.
-    
-    In both examples below, the main result is that the empirical covariance
-    estimate, as a non-robust one, is highly influenced by the heterogeneous
-    structure of the observations. Although the robust covariance estimate is
-    able to focus on the main mode of the data distribution, it sticks to the
-    assumption that the data should be Gaussian distributed, yielding some biased
-    estimation of the data structure, but yet accurate to some extent.
-    The One-Class SVM does not assume any parametric form of the data distribution
-    and can therefore model the complex shape of the data much better.
-    """
-    
-    # Author: Virgile Fritsch <virgile.fritsch@inria.fr>
-    # License: BSD 3 clause
-    
-    # %%
-    # First example
-    # -------------
-    #
-    # The first example illustrates how the Minimum Covariance Determinant
-    # robust estimator can help concentrate on a relevant cluster when outlying
-    # points exist. Here the empirical covariance estimation is skewed by points
-    # outside of the main cluster. Of course, some screening tools would have pointed
-    # out the presence of two clusters (Support Vector Machines, Gaussian Mixture
-    # Models, univariate outlier detection, ...). But had it been a high-dimensional
-    # example, none of these could be applied that easily.
-    #from sklearn.covariance import EllipticEnvelope
-    #from sklearn.inspection import DecisionBoundaryDisplay
-    #from sklearn.svm import OneClassSVM
-    
-    estimators = {
-        "Empirical Covariance": EllipticEnvelope(support_fraction=1.0, contamination=0.25),
-        "Robust Covariance (Minimum Covariance Determinant)": EllipticEnvelope(
-            contamination=0.25
-        ),
-        "OCSVM": OneClassSVM(nu=0.25, gamma=0.35),
-    }
-    
-    # %%
-    import matplotlib.lines as mlines
-    #import matplotlib.pyplot as plt
-    
-    from sklearn.datasets import load_wine
-    print (load_wine()["data"])
-    print (load_wine()["data"].shape)
-    
-
-    
-    X = load_wine()["data"][:, [1, 2]]  # two clusters
-    
-
-    print (X)
-    print (X[:, 0])
-    print (X[:, 1])
-  
-    fig, ax = plt.subplots()
-    colors = ["tab:blue", "tab:orange", "tab:red"]
-    # Learn a frontier for outlier detection with several classifiers
-    legend_lines = []
-    for color, (name, estimator) in zip(colors, estimators.items()):
-        estimator.fit(X)
-        DecisionBoundaryDisplay.from_estimator(
-            estimator,
-            X,
-            response_method="decision_function",
-            plot_method="contour",
-            levels=[0],
-            colors=color,
-            ax=ax,
-        )
-        legend_lines.append(mlines.Line2D([], [], color=color, label=name))
-    
-    
-    ax.scatter(X[:, 0], X[:, 1], color="black")
-    bbox_args = dict(boxstyle="round", fc="0.8")
-    arrow_args = dict(arrowstyle="->")
-    ax.annotate(
-        "outlying points",
-        xy=(4, 2),
-        xycoords="data",
-        textcoords="data",
-        xytext=(3, 1.25),
-        bbox=bbox_args,
-        arrowprops=arrow_args,
-    )
-    ax.legend(handles=legend_lines, loc="upper center")
-    _ = ax.set(
-        xlabel="ash",
-        ylabel="malic_acid",
-        title="Outlier detection on a real data set (wine recognition)",
-    )
-    plt.show()
-    
-    
-def OutliersTest2():
-    '''
-    '''
-    # evaluate model performance with outliers removed using isolation forest
-    from pandas import read_csv
-    from sklearn.model_selection import train_test_split
-    from sklearn.linear_model import LinearRegression
-    from sklearn.ensemble import IsolationForest
-    from sklearn.metrics import mean_absolute_error
-    # load the dataset
-    url = 'https://raw.githubusercontent.com/jbrownlee/Datasets/master/housing.csv'
-    df = read_csv(url, header=None)
-    # retrieve the array
-    data = df.values
-    # split into input and output elements
-    X, y = data[:, :-1], data[:, -1]
-    # split into train and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
-    # summarize the shape of the training dataset
-    print(X_train.shape, y_train.shape)
-    print(X_test.shape, y_test.shape)
-    # identify outliers in the training dataset
-    iso = IsolationForest(contamination=0.1)
-    yhat = iso.fit_predict(X_train)
-    # select all rows that are not outliers
-    mask = yhat != -1
-    X_train, y_train = X_train[mask, :], y_train[mask]
-    # summarize the shape of the updated training dataset
-    print(X_train.shape, y_train.shape)
-    # fit the model
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-    # evaluate the model
-    yhat = model.predict(X_test)
-    # evaluate predictions
-    mae = mean_absolute_error(y_test, yhat)
-    print('MAE: %.3f' % mae)
-    SNULLE
 
 def Today():
 
@@ -999,7 +854,23 @@ def SetFigSize(xadd, yadd, sizeX, sizeY, subFigSizeX, subFigSizeY, cols, rows):
         
     return (figSizeX, figSizeY)
 
-def PlotFilterExtract(plotLayout, corrTxtL, originalDF, filterDF, plotFPN):
+def GetPlotStyle(plotLayout):
+    
+    if plotLayout.linewidth: # linewidth == 0, no lines
+        
+        plotStyle = plotLayout.linestyle
+    
+    else:
+        
+        plotStyle = ''
+        
+    if plotLayout.pointsize:
+        
+        plotStyle += plotLayout.pointstyle
+        
+    return plotStyle
+
+def PlotFilterExtract(plotLayout, filterTxt, originalDF, filterDF, plotFPN):
     """
     """
     from math import ceil
@@ -1039,14 +910,48 @@ def PlotFilterExtract(plotLayout, corrTxtL, originalDF, filterDF, plotFPN):
     origx = [float(i) for i in originalDF.columns]
     
     filterx =  [float(i) for i in filterDF.columns]
-                     
+        
+    # Get the plot style
+    plotStyle =  GetPlotStyle(plotLayout)
+                         
     for c, key in enumerate(subplotsD):
         
         if c == 1:
                 
             ax[c].set(xlabel='wavelength')
-                  
-        ax[c].set(ylabel=plotLayout.scatterCorrection.ylabels[c])
+            
+            if plotLayout.filterExtraction.annotate.filtered:
+                
+                if plotLayout.filterExtraction.annotate.filtered == 'auto':
+                 
+                    txtStr = 'Filtered spectra\n  %s\n  %s total bands\n  showing every %s band' %(filterTxt, len(filterx),plotskipStep)
+                    
+                else:
+                    
+                    txtStr = plotLayout.filterExtraction.annotate.filtered
+            
+                ax[c].annotate(txtStr,
+                           (plotLayout.filterExtraction.annotate.x,
+                            plotLayout.filterExtraction.annotate.y),
+                           xycoords = 'axes fraction' )
+        else:
+            
+            if plotLayout.filterExtraction.annotate.original:
+                
+                if plotLayout.filterExtraction.annotate.original == 'auto':
+                   
+                    txtStr = 'Original spectra\n  %s total bands\n  showing every %s band' %(len(origx),plotskipStep) 
+                
+                else:
+                    
+                    txtStr = plotLayout.filterExtraction.annotate.original
+  
+                ax[c].annotate(txtStr,
+                           (plotLayout.filterExtraction.annotate.x,
+                            plotLayout.filterExtraction.annotate.y),
+                           xycoords = 'axes fraction' )
+                      
+        ax[c].set(ylabel=plotLayout.filterExtraction.ylabels[c])
                                         
         # Loop over the spectra
         i = -1
@@ -1060,12 +965,12 @@ def PlotFilterExtract(plotLayout, corrTxtL, originalDF, filterDF, plotFPN):
             if i % plotskipStep == 0:
                 
                 if c == 0:
-                                     
-                    ax[c].plot(origx, row, color=slicedCM[n])
                     
+                    ax[c].plot(origx, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
                 else:
                     
-                    ax[c].plot(filterx, row, color=slicedCM[n])
+                    ax[c].plot(filterx, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
                     
                 n += 1
                 
@@ -1092,14 +997,10 @@ def PlotFilterExtract(plotLayout, corrTxtL, originalDF, filterDF, plotFPN):
     if plotLayout.savePng:
     
         filterfig.savefig(plotFPN)   # save the figure to file
-    
-        infostr = 'Plots of spectra Preprocessing chain saved as:\n    %s' %(plotFPN)
-        
-        print(infostr)
-         
+           
     plt.close(filterfig)
-        
-                        
+
+                          
 def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
          trainOriginalDF, testOriginalDF,  
                     trainCorr1DF, testCorr1DF, trainCorr2DF=None, testCorr2DF=None):
@@ -1117,25 +1018,48 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
     
     ttratio = plotskipStep / ceil( (len(testOriginalDF.index)-1)/maxSpectra)
     
+    annotateStrD = {0:'', 1:'', 2:'',}
+    
+    if plotLayout.scatterCorrection.annotate.input:          
+        if plotLayout.scatterCorrection.annotate.input == 'auto':
+            annotateStrD[0] = 'Input spectra\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[0] = plotLayout.scatterCorrection.annotate.input
+            
+    if plotLayout.scatterCorrection.annotate.firstcorrect:          
+        if plotLayout.scatterCorrection.annotate.firstcorrect == 'auto':
+            annotateStrD[1] = 'After %s correction\n  showing every %s band' %(corrTxtL[0], plotskipStep)
+        else:
+            annotateStrD[1] = plotLayout.scatterCorrection.annotate.firstcorrect
+    
+    if len(corrTxtL) > 1 and plotLayout.scatterCorrection.annotate.secondcorrect:          
+        if plotLayout.scatterCorrection.annotate.secondcorrect == 'auto':
+            annotateStrD[2] = 'After %s correction\n  showing every %s band' %(corrTxtL[1], plotskipStep)
+        else:
+            annotateStrD[2] = plotLayout.scatterCorrection.annotate.secondcorrect        
+            
     # Create empty dict to hold the data
     subplotsD = {}
     
     subplotsD['original'] = {}
-    
-    subplotsD['corrfinal'] = {}
-    
+        
     subplotsD['original']['train'] = {'label': 'Training data (original)',
                                       'DF' : trainOriginalDF}
     
     subplotsD['original']['test'] = { 'label': 'Test data (original)',
                                       'DF' : testOriginalDF}
         
-    if trainCorr2DF == None:
+        
+    
+    
+    if len(corrTxtL) == 1:
         
         rmax = 1
 
         #fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
         scatplotfig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey='row' )
+        
+        subplotsD['corrfinal'] = {}
         
         subplotsD['corrfinal']['train'] = { 'label': 'Scatter correction: %s' %(corrTxtL[0]),
                                        'DF' : trainCorr1DF}
@@ -1150,30 +1074,36 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
         #fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
         scatplotfig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8), sharex=True, sharey='row' )
         
-        subplotsD['corrintermediate'] = {}
+        # Intermed must be declared before final
+        subplotsD['corrintermed'] = {}
+        
+        subplotsD['corrfinal'] = {}
                 
-        subplotsD['corrintermediat']['train'] = { 'column': 0, 'row':1,
+        subplotsD['corrintermed']['train'] = { 'column': 0, 'row':1,
                                     'label': 'Scatter correction: %s' %(corrTxtL[0]),
                                     'DF' : trainCorr2DF}
     
-        subplotsD['corrintermediat']['test'] = { 'column': 1, 'row':1,
+        subplotsD['corrintermed']['test'] = { 'column': 1, 'row':1,
                                     'label': 'Scatter correction: %s' %(corrTxtL[0]),
                                     'DF' : testCorr2DF}
         
         subplotsD['corrfinal']['train'] = { 'column': 0, 'row':2,
-                                    'label': 'Scatter correction: %s+%s' %(corrTxtL[0], corrTxtL[1]),
+                                    'label': 'Scatter correction: %s' %(corrTxtL[1]),
                                     'DF' : trainCorr1DF}
     
         subplotsD['corrfinal']['test'] = { 'column': 1, 'row':2,
-                                    'label': 'scatter correct. %s+%s' %(corrTxtL[0], corrTxtL[1]),
+                                    'label': 'scatter correct. %s' %(corrTxtL[1]),
                                     'DF' : testCorr1DF}
    
     n = int(len(trainOriginalDF.index)/plotskipStep)+1
         
     # With n bands known, create the colorRamp
-    slicedCM = SetcolorRamp(n, 'jet')
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
     
     x_spectra_integers = [int(i) for i in columns]
+    
+    # Get the plot style
+    plotStyle =  GetPlotStyle(plotLayout)
     
     for r, key in enumerate(subplotsD):
         
@@ -1186,6 +1116,11 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
         for c, subplotkey in enumerate(subplotsD[key]):
             
             ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
+            
+            ax[r][c].annotate(annotateStrD[r],
+                           (plotLayout.scatterCorrection.annotate.x,
+                            plotLayout.scatterCorrection.annotate.y),
+                           xycoords = 'axes fraction' )
             
             if c == 0:
                   
@@ -1203,13 +1138,19 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
                 if i % plotskipStep == 0:
                                          
                     if c == 0:
-                        ax[r][c].plot(x_spectra_integers, row, color=slicedCM[n])
+                        #ax[r][c].plot(x_spectra_integers, row, color=slicedCM[n])
+                        
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
                         
                     else:
                         
                         m = ceil(n*ttratio)
                         
-                        ax[r][c].plot(x_spectra_integers, row, color=slicedCM[m])
+                        #ax[r][c].plot(x_spectra_integers, row, color=slicedCM[m])
+                        
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
                                 
                     n += 1
                 
@@ -1228,7 +1169,7 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
     if plotLayout.tightLayout:
     
         scatplotfig.tight_layout()
-                         
+            
     if plotLayout.screenShow:
     
         plt.show()
@@ -1237,9 +1178,9 @@ def PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns,
     
         scatplotfig.savefig(plotFPN)   # save the figure to file
     
-        infostr = 'Plots of scatter correction saved as:\n    %s' %(plotFPN)
+        #infostr = 'Plots of scatter correction saved as:\n    %s' %(plotFPN)
         
-        print(infostr)
+        #print(infostr)
          
     plt.close(scatplotfig)
 
@@ -1263,20 +1204,19 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
     firstCorrTrainDf = None
                 
     firstCorrTestDf = None
-    
-    #arr1 = [[1.1,2.2,3.3],[2.4,2.5,1.4]]
-    
-    #arr2 = [[1.1,2.2,3.3]]
-    
-    #trainDF = np.asarray(arr1)
-    #testDF = np.asarray(arr2)
-    
+        
     scattCorrTxt = 'None'
     
     corrTxtL = []
     
     for singleScattCorr in scattercorrection.singles:
         
+        if not singleScattCorr in normD:
+            
+            exitStr = 'EXITING - unrecognized scatter correction method: %s' %(singleScattCorr)
+            
+            exit(exitStr) 
+            
         scattCorrTxt = normD[singleScattCorr]['label']
         
         corrTxtL.append(scattCorrTxt)
@@ -1289,40 +1229,12 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             X1, N1 = normalize(trainDF, norm=singleScattCorr, return_norm=True) 
             
             X2, N2 = normalize(testDF, norm=singleScattCorr, return_norm=True) 
-            '''
-            print ('trainDF',trainDF)
-            print ('X1',X1)
-            print ('N1',N1)
-            print ('testDF',testDF)
-            print ('X2',X2)
-            print ('N2',N2)
-            print ('scatcorr',scatcorr)
-            '''
 
-        
-            #scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
-            #trainDF[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
-            #testDFD[scatcorr]['DF'] = pd.DataFrame(data=X2, columns=columns)
             trainDF = pd.DataFrame(data=X1, columns=columns)
             testDF = pd.DataFrame(data=X2, columns=columns)
             
         elif singleScattCorr == 'snv':
             
-            '''
-            print (trainDF)
-            X1 = snv(trainDF) 
-            
-            X2 = snv(testDF) 
-            
-            print ('trainDF',trainDF)
-            print ('X1',X1)
-     
-            print ('testDF',testDF)
-            print ('X2',X2)
-      
-            print ('scatcorr',scatcorr)
-
-            '''
             X1 = np.array(trainDF[columns])
             
             X1 = snv(X1)
@@ -1331,33 +1243,11 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             
             X2 = snv(X2)
             
-            #scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=snvSpectra, columns=columns)
-            #trainDFD[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
-            #testDFD[scatcorr]['DF'] = pd.DataFrame(data=X2, columns=columns)
-            
             trainDF = pd.DataFrame(data=X1, columns=columns)
             testDF = pd.DataFrame(data=X2, columns=columns)
 
         elif singleScattCorr == 'msc':
-            
-            '''
-            X1,M1 = msc(trainDF) 
-            
-            X2,M2 = msc(testDF, M1) 
-            
-            print ('trainDF',trainDF)
-            print ('X1',X1)
-            print ('M1',M1)
-     
-            print ('testDF',testDF)
-            print ('X2',X2)
-            print ('M2',M2)
-      
-            print ('scatcorr',scatcorr)
 
-            '''
-            #X = dataFrame[columns]
-            
             X1 = np.array(trainDF[columns])
             
             X1, M1[0] = msc(X1)
@@ -1365,26 +1255,23 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             X2 = np.array(testDF[columns])
             
             X2, M2 = msc(X2,M1[0])
-            
-            #scatcorrDFD[scatcorr]['DF'] = pd.DataFrame(data=mscSpectra, columns=columns)
-            #trainDFD[scatcorr]['DF'] = pd.DataFrame(data=X1, columns=columns)
-            #testDFD[scatcorr]['DF'] = pd.DataFrame(data=X2, columns=columns)
+
             trainDF = pd.DataFrame(data=X1, columns=columns)
             testDF = pd.DataFrame(data=X2, columns=columns)
             
+        else:
+            
+            exitStr = 'EXITING - unrecognized scatter correction method: %s' %(singleScattCorr)
+            
+            exit(exitStr)
+            
     for s, dualScattCorr in enumerate(scattercorrection.duals):
-        '''
-        scatcorr = '%s+%s' %(d[0],d[1])
         
-        label = '%s + %s' %(normD[d[0]]['label'], normD[d[1]]['label'])
-        
-        trainDFD[scatcorr] = {'label': label}
-        testDFD[scatcorr] = {'label': label}
-        '''
-        #scatcorrDFD[scatcorr] = {'label': label}
-        
-        #print ('s',s)
-        #print ('scattCorr',dualScattCorr)
+        if not dualScattCorr in normD:
+            
+            exitStr = 'EXITING - unrecognized scatter correction method: %s' %(dualScattCorr)
+            
+            exit(exitStr)
         
         if s == 0:
             
@@ -1393,62 +1280,59 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
         else:
             
             scattCorrTxt += '+%s' %(normD[dualScattCorr]['label'])
+   
+        corrTxtL.append(scattCorrTxt)
         
         dualTrainDF = deepcopy(trainDF)
         dualTestDF = deepcopy(testDF)
-        
-        
-        for i in range(2):
-            
-            print ('scatcorr',dualScattCorr)
+                    
+        print ('scatcorr',dualScattCorr)
 
-            if dualScattCorr in ['l1','l2','max']:
-                
-                X1 = np.array(dualTrainDF[columns])
-                
-                X1 = normalize(X1, norm=dualScattCorr ) 
-                
-                dualTrainDF = pd.DataFrame(data=X1, columns=columns)
-                
-                X2 = np.array(dualTestDF[columns])
-                
-                X2 = normalize(X2, norm=dualScattCorr ) 
-                
-                dualTestDF = pd.DataFrame(data=X2, columns=columns)
-              
-            elif dualScattCorr  == 'snv':
-                
-                X1 = np.array(dualTrainDF[columns])
-                
-                X1 = snv(X1)
-                
-                dualTrainDF = pd.DataFrame(data=X1, columns=columns)
-                
-                X2 = np.array(dualTestDF[columns])
-                
-                X2 = snv(X2)
-                
-                dualTestDF = pd.DataFrame(data=X2, columns=columns)
+        if dualScattCorr in ['l1','l2','max']:
             
-            elif dualScattCorr == 'msc':
-                
-                X1 = np.array(dualTrainDF[columns])
-                
-                X1, M1[i] = msc(X1)
-                
-                dualTrainDF = pd.DataFrame(data=X1, columns=columns)
-                
-                X2 = np.array(dualTestDF[columns])
-                
-                X2, M2 = msc(X2,M1[i])
-                
-                dualTestDF = pd.DataFrame(data=X2, columns=columns)
-                
-            if i == 0:
-        
-                firstCorrTrainDf = deepcopy(dualTrainDF)
-                
-                firstCorrTestDf = deepcopy(dualTestDF)
+            X1 = np.array(dualTrainDF[columns])
+            
+            X1 = normalize(X1, norm=dualScattCorr ) 
+                        
+            X2 = np.array(dualTestDF[columns])
+            
+            X2 = normalize(X2, norm=dualScattCorr ) 
+          
+        elif dualScattCorr  == 'snv':
+            
+            X1 = np.array(dualTrainDF[columns])
+            
+            X1 = snv(X1)
+            
+            X2 = np.array(dualTestDF[columns])
+            
+            X2 = snv(X2)
+                  
+        elif dualScattCorr == 'msc':
+            
+            X1 = np.array(dualTrainDF[columns])
+            
+            X1, M1[s] = msc(X1)
+            
+            X2 = np.array(dualTestDF[columns])
+            
+            X2, M2 = msc(X2,M1[s])
+            
+        else:
+            
+            exitStr = 'EXITING - unrecognized scatter correction method: %s' %(dualScattCorr)
+            
+            exit(exitStr)
+            
+        dualTrainDF = pd.DataFrame(data=X1, columns=columns)
+            
+        dualTestDF = pd.DataFrame(data=X2, columns=columns)
+            
+        if s == 0:
+    
+            firstCorrTrainDf = deepcopy(dualTrainDF)
+            
+            firstCorrTestDf = deepcopy(dualTestDF)
                 
         trainDF= dualTrainDF
         
@@ -1456,7 +1340,7 @@ def ScatterCorrectDF(trainDF, testDF, scattercorrection, columns):
             
     return scattCorrTxt, corrTxtL, trainDF, testDF, firstCorrTrainDf, firstCorrTestDf, M1
                       
-def SpectraScatterCorrectionFromDf(trainDF, testDF, scattercorrection, plotLayout, plotFPN):
+def ScatterCorrection(trainDF, testDF, scattercorrection, plotLayout, plotFPN):
     """ Scatter correction for spectral signals
 
         :returns: organised spectral derivates
@@ -1464,19 +1348,303 @@ def SpectraScatterCorrectionFromDf(trainDF, testDF, scattercorrection, plotLayou
     """
     
     columns = [item for item in trainDF]
-    
+        
     origTrainDF = deepcopy(trainDF)
     
     origTestDF = deepcopy(testDF)
     
-    scattCorrTxt, corrTxtL, trainDF, testDF, xTrainDF, xtestDF, scatCorrMeanSpectraL = ScatterCorrectDF(trainDF, testDF, scattercorrection, columns)
+    scattCorrTxt, corrTxtL, trainDF, testDF, firstCorrTrainDF, firstCorrTestDF, scatCorrMeanSpectraL = ScatterCorrectDF(trainDF, testDF, scattercorrection, columns)
     
     #NoN can develop and must be removed
-    
-    PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns, origTrainDF, origTestDF, trainDF, testDF, xTrainDF, xtestDF)
+
+    PlotScatterCorr(plotLayout, plotFPN, corrTxtL, columns, origTrainDF, origTestDF, trainDF, testDF, firstCorrTrainDF, firstCorrTestDF)
 
     return scattCorrTxt, trainDF, testDF,  scatCorrMeanSpectraL
 
+def PlotDerivatives(X_train, X_test, X_train_derivative, X_test_derivative, 
+                    columns, dColumns, plotLayout, plotFPN):
+    """
+    """
+    from math import ceil
+    
+    # Get the plot layout arguments
+    maxSpectra = plotLayout.maxSpectra
+            
+    subplotTitles = plotLayout.derivative.subplotTitles
+    
+    # Get the bands to plot
+    plotskipStep = ceil( (len(X_train.index)-1)/maxSpectra )
+    
+    # ttration = trian-test ratio - only for adjusting colorramp
+    ttratio = plotskipStep / ceil( (len(X_test.index)-1)/maxSpectra)
+    
+    # Create empty dict to hold the data
+    subplotsD = {}
+    
+    subplotsD['input'] = {}
+    
+    subplotsD['derivative'] = {}
+    
+    subplotsD['input']['train'] = {'label': 'Training data (input)',
+                                      'DF' : X_train}
+    
+    subplotsD['input']['test'] = { 'label': 'Test data (input)',
+                                      'DF' : X_test}
+    
+    subplotsD['derivative']['train'] = {'label': 'Derivative',
+                                      'DF' : X_train_derivative}
+    
+    subplotsD['derivative']['test'] = { 'label': 'Derivatives',
+                                      'DF' : X_test_derivative}
+  
+    #fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
+    derivativeplotfig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey='row' )
+        
+    n = int(len(X_train.index)/plotskipStep)+1
+        
+    # With n bands known, create the colorRamp
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
+    
+    annotateStrD = {0:'', 1:'', 2:'',}
+    
+    if plotLayout.derivative.annotate.input:          
+        if plotLayout.derivative.annotate.input == 'auto':
+            annotateStrD[0] = 'Input spectra\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[0] = plotLayout.derivative.annotate.input
+            
+    if plotLayout.derivative.annotate.derivative:          
+        if plotLayout.derivative.annotate.derivative == 'auto':
+            annotateStrD[1] = 'Derivatives\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[1] = plotLayout.derivative.annotate.derivative
+    
+    # Get the plot style
+    plotStyle =  GetPlotStyle(plotLayout)
+    
+    xD = {}
+    
+    xD[0] = list(columns.values())
+    
+    xD[1] = list(dColumns.values())
+    
+    for r, key in enumerate(subplotsD):
+        
+        if r == 1:
+                
+                for c in range(len(subplotsD[key])):
+                
+                    ax[r][c].set(xlabel='wavelength')
+        
+        for c, subplotkey in enumerate(subplotsD[key]):
+            
+            ax[r][c].annotate(annotateStrD[r],
+                           (plotLayout.scatterCorrection.annotate.x,
+                            plotLayout.scatterCorrection.annotate.y),
+                           xycoords = 'axes fraction' )
+            
+            ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
+            
+            if c == 0:
+                  
+                ax[r][c].set(ylabel=plotLayout.derivative.ylabels[r])
+                                        
+            # Loop over the spectra
+            i = -1
+        
+            n = 0
+            
+            for index, row in subplotsD[key][subplotkey]['DF'].iterrows():
+                
+                i += 1
+                
+                if i % plotskipStep == 0:
+                                         
+                    if c == 0:
+
+                        ax[r][c].plot(xD[r], row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+  
+                    else:
+                        
+                        m = ceil(n*ttratio)
+                                               
+                        ax[r][c].plot(xD[r], row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+            
+                    n += 1
+                
+    # Set supTitle
+    if plotLayout.derivative.supTitle:
+        
+        if plotLayout.derivative.supTitle == 'auto':
+            
+            derivativeplotfig.suptitle('Derivative')
+        
+        else:
+    
+            derivativeplotfig.suptitle(plotLayout.derivative.supTitle)
+    
+    # Set tight layout if requested
+    if plotLayout.tightLayout:
+    
+        derivativeplotfig.tight_layout()
+                        
+    if plotLayout.screenShow:
+    
+        plt.show()
+    
+    if plotLayout.savePng:
+    
+        derivativeplotfig.savefig(plotFPN)   # save the figure to file
+    
+        #infostr = 'Plots of standardisation saved as:\n    %s' %(plotFPN)
+        
+        #print(infostr)
+         
+    plt.close(derivativeplotfig)
+    
+def PlotPCA(plotLayout, plotFPN, pcaTxt, columnsD,
+         trainInputDF, testInputDF, trainPCADF, testPCADF):
+    """ Combine with standatdisation and derivation etc
+    """
+    from math import ceil
+    
+    # Get the plot layout arguments
+    maxSpectra = plotLayout.maxSpectra
+            
+    subplotTitles = plotLayout.pca.subplotTitles
+    
+    # Get the bands to plot
+    plotskipStep = ceil( (len(trainInputDF.index)-1)/maxSpectra )
+    
+    # ttration = trian-test ratio - only for adjusting colorramp
+    ttratio = plotskipStep / ceil( (len(testInputDF.index)-1)/maxSpectra)
+    
+    # Create empty dict to hold the data
+    subplotsD = {}
+    
+    subplotsD['original'] = {}
+    
+    subplotsD['standardised'] = {}
+    
+    subplotsD['original']['train'] = {'label': 'Training data (input)',
+                                      'DF' : trainInputDF}
+    
+    subplotsD['original']['test'] = { 'label': 'Test data (input)',
+                                      'DF' : testInputDF}
+    
+    subplotsD['standardised']['train'] = {'label': 'Principal components',
+                                      'DF' : trainPCADF}
+    
+    subplotsD['standardised']['test'] = { 'label': 'Principal components',
+                                      'DF' : testPCADF}
+  
+    #fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
+    pcaplotfig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex='row', sharey='row' )
+        
+    n = int(len(trainInputDF.index)/plotskipStep)+1
+        
+    # With n bands known, create the colorRamp
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
+    
+    
+    
+    annotateStrD = {0:'', 1:'', 2:'',}
+    
+    if plotLayout.pca.annotate.input:          
+        if plotLayout.pca.annotate.input == 'auto':
+            annotateStrD[0] = 'Input spectra\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[0] = plotLayout.pca.annotate.input
+            
+    if plotLayout.pca.annotate.output:          
+        if plotLayout.pca.annotate.output == 'auto':
+            annotateStrD[1] = 'Eigen vectors\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[1] = plotLayout.pca.annotate.output
+    
+    # Get the plot style
+    plotStyle =  GetPlotStyle(plotLayout)
+
+    for r, key in enumerate(subplotsD):
+        
+        if r == 0:
+                
+                for c in range(len(subplotsD[key])):
+                
+                    ax[r][c].set(xlabel='wavelength')
+                    
+                x_spectra_integers = list(columnsD.values())
+                    
+        if r == 1:
+                
+            for c in range(len(subplotsD[key])):
+                
+                ax[r][c].set(xlabel='component')
+                
+                x_spectra_integers = np.arange(0,len(trainPCADF.columns))
+        
+        for c, subplotkey in enumerate(subplotsD[key]):
+            
+            ax[r][c].annotate(annotateStrD[r],
+                           (plotLayout.scatterCorrection.annotate.x,
+                            plotLayout.scatterCorrection.annotate.y),
+                           xycoords = 'axes fraction' )
+            
+            ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
+            
+            if c == 0:
+                  
+                ax[r][c].set(ylabel=plotLayout.pca.ylabels[r])
+                                        
+            # Loop over the spectra
+            i = -1
+        
+            n = 0
+            
+            for index, row in subplotsD[key][subplotkey]['DF'].iterrows():
+                
+                i += 1
+                
+                if i % plotskipStep == 0:
+                                         
+                    if c == 0:
+                        
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+   
+                    else:
+                        
+                        m = ceil(n*ttratio)
+                                                
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+           
+                    n += 1
+                
+    # Set supTitle
+    if plotLayout.pca.supTitle:
+        
+        if plotLayout.pca.supTitle == 'auto':
+            
+            pcaplotfig.suptitle('Principal Component Analysis (PCA)')
+        
+        else:
+    
+            pcaplotfig.suptitle(plotLayout.pca.supTitle)
+    
+    # Set tight layout if requested
+    if plotLayout.tightLayout:
+    
+        pcaplotfig.tight_layout()
+                
+    if plotLayout.screenShow:
+    
+        plt.show()
+    
+    if plotLayout.savePng:
+    
+        pcaplotfig.savefig(plotFPN)  
+         
+    plt.close(pcaplotfig)
+    
 def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
          trainOriginalDF, testOriginalDF, trainStandarisedDF, testStandarisedDF):
     """
@@ -1501,10 +1669,10 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
     
     subplotsD['standardised'] = {}
     
-    subplotsD['original']['train'] = {'label': 'Training data (original)',
+    subplotsD['original']['train'] = {'label': 'Training data (input)',
                                       'DF' : trainOriginalDF}
     
-    subplotsD['original']['test'] = { 'label': 'Test data (original)',
+    subplotsD['original']['test'] = { 'label': 'Test data (input)',
                                       'DF' : testOriginalDF}
     
     subplotsD['standardised']['train'] = {'label': 'Standardisation: %s' %(standardTxt),
@@ -1519,10 +1687,27 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
     n = int(len(trainOriginalDF.index)/plotskipStep)+1
         
     # With n bands known, create the colorRamp
-    slicedCM = SetcolorRamp(n, 'jet')
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
     
     x_spectra_integers = [int(i) for i in columns]
     
+    annotateStrD = {0:'', 1:'', 2:'',}
+    
+    if plotLayout.standardisation.annotate.input:          
+        if plotLayout.standardisation.annotate.input == 'auto':
+            annotateStrD[0] = 'Input spectra\n  showing every %s band' %(plotskipStep)
+        else:
+            annotateStrD[0] = plotLayout.standardisation.annotate.input
+            
+    if plotLayout.standardisation.annotate.standard:          
+        if plotLayout.standardisation.annotate.standard == 'auto':
+            annotateStrD[1] = 'After %s\n  showing every %s band' %(standardTxt, plotskipStep)
+        else:
+            annotateStrD[1] = plotLayout.standardisation.annotate.standard
+    
+    # Get the plot style
+    plotStyle =  GetPlotStyle(plotLayout)
+
     for r, key in enumerate(subplotsD):
         
         if r == 1:
@@ -1532,6 +1717,11 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
                     ax[r][c].set(xlabel='wavelength')
         
         for c, subplotkey in enumerate(subplotsD[key]):
+            
+            ax[r][c].annotate(annotateStrD[r],
+                           (plotLayout.scatterCorrection.annotate.x,
+                            plotLayout.scatterCorrection.annotate.y),
+                           xycoords = 'axes fraction' )
             
             ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
             
@@ -1551,13 +1741,19 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
                 if i % plotskipStep == 0:
                                          
                     if c == 0:
-                        ax[r][c].plot(x_spectra_integers, row, color=slicedCM[n])
+                        #ax[r][c].plot(x_spectra_integers, row, color=slicedCM[n])
+                        
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
                         
                     else:
                         
                         m = ceil(n*ttratio)
                         
-                        ax[r][c].plot(x_spectra_integers, row, color=slicedCM[m])
+                        #ax[r][c].plot(x_spectra_integers, row, color=slicedCM[m])
+                        
+                        ax[r][c].plot(x_spectra_integers, row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
                                 
                     n += 1
                 
@@ -1577,7 +1773,6 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
     
         standardplotfig.tight_layout()
                 
-     
     if plotLayout.screenShow:
     
         plt.show()
@@ -1586,16 +1781,16 @@ def PlotStandardisation(plotLayout, plotFPN, standardTxt, columns,
     
         standardplotfig.savefig(plotFPN)   # save the figure to file
     
-        infostr = 'Plots of standardisation saved as:\n    %s' %(plotFPN)
+        #infostr = 'Plots of standardisation saved as:\n    %s' %(plotFPN)
         
-        print(infostr)
+        #print(infostr)
          
     plt.close(standardplotfig)
     
 def Standardisation(X_train, X_test, standardisation, plotLayout, plotFPN):
         """
         """
-
+        
         scalertxt = 'None'
         
         origTrain = deepcopy(X_train)
@@ -1603,7 +1798,7 @@ def Standardisation(X_train, X_test, standardisation, plotLayout, plotFPN):
         origTest = deepcopy(X_test)
         
         columns = [item for item in X_train.columns]
-
+        
         # extract the covariate columns as X
         X1 = X_train[columns]
         
@@ -1680,24 +1875,96 @@ def Standardisation(X_train, X_test, standardisation, plotLayout, plotFPN):
             
             standardisation.apply = False
             
+            exit('EXITING - standardisation.apply is set to true but no method defined\n either set standardisation.apply to false or pick a method')
+            
         if standardisation.apply:
             # Reset the train and test dataframes                
             X_train = pd.DataFrame(data=X1A, columns=columns)
             X_test = pd.DataFrame(data=X2A, columns=columns)
-            
-    
-            '''
-            test = (X2 - scaler.mean_)/scaler.scale_
-            
-            X_test = pd.DataFrame(data=X2A, columns=columnsX)
-            
-            print ('X_test',X_test)
-            '''       
+                  
             PlotStandardisation(plotLayout, plotFPN, scalertxt, columns,
                                 origTrain, origTest, X_train, X_test)
             
      
-        return scalertxt, scaler.mean_, scaler.scale_
+        return X_train, X_test, scalertxt, scaler.mean_, scaler.scale_
+     
+def Derivatives(X_train, X_test, joinDerivative, Xcolumns, plotLayout, plotFPN):
+    '''
+    '''
+        
+    columnsStr = list(Xcolumns.keys())
+    
+    columnsNum = list(Xcolumns.values())
+    
+    
+    # Get the derivatives
+    X_train_derivative = X_train.diff(axis=1, periods=1)
+
+    # Drop the first column as it will have only NaN
+    X_train_derivative = X_train_derivative.drop(columnsStr[0], axis=1)
+
+    # Create the derivative columns
+    derivativeColumnsNum = [ (columnsNum[i-1]+columnsNum[i])/2 for i in range(len(columnsNum)) if i > 0]
+    
+    # Check the numeric format of derivativeColumnsNum:
+    allIntegers = True
+    
+    for item in derivativeColumnsNum:
+
+        if item % int(item) != 0:
+            
+            allIntegers = False
+            
+            break
+       
+    if allIntegers:
+        
+        derivativeColumnsNum = [int(item) for item in derivativeColumnsNum]
+        
+        derivativeColumnsStr = ['d%s' % i for i in derivativeColumnsNum]
+    
+    else:
+        
+        derivativeColumnsStr = ['d%.1f' % i for i in derivativeColumnsNum]
+             
+    dColumns = dict(zip(derivativeColumnsStr,derivativeColumnsNum) )
+
+    # Replace the columns
+    X_train_derivative.columns = derivativeColumnsStr
+    
+    # Repeat with test data
+    # Get the derivatives
+    X_test_derivative = X_test.diff(axis=1, periods=1)
+
+    # Drop the first column as it will have only NaN
+    X_test_derivative = X_test_derivative.drop(columnsStr[0], axis=1)
+    
+    # Replace the columns
+    X_test_derivative.columns = derivativeColumnsStr
+    
+    PlotDerivatives(X_train, X_test, X_train_derivative, X_test_derivative, Xcolumns, dColumns, plotLayout, plotFPN )
+    
+    if joinDerivative:
+
+        X_train_frames = [X_train, X_train_derivative]
+
+        X_train = pd.concat(X_train_frames, axis=1)
+        
+        X_test_frames = [X_test, X_test_derivative]
+
+        X_test = pd.concat(X_test_frames, axis=1)
+        
+        columns = {**Xcolumns, **dColumns }
+        
+    else:
+
+        X_train = X_train_derivative
+        
+        X_test = X_test_derivative
+        
+        columns = dColumns
+        
+    return X_train, X_test, columns
        
 def SetMultiCompDstFPNs(rootPath, arrangeDataPath, multiProjectComparisonD):
     '''
@@ -1774,40 +2041,42 @@ def SetMultCompPlots(multiProjectComparisonD, targetFeatureSymbolsD, figCols):
     
     # Set the regression models to include:
     
-    for r,row in enumerate(multiProjectComparisonD['regressionModels']):
+    for r,row in enumerate(multiProjectComparisonD['modelling']['regressionModels']):
 
-        if multiProjectComparisonD['regressionModels'][row]['apply']:
+        if multiProjectComparisonD['modelling']['regressionModels'][row]['apply']:
             
             regressionModelL.append(row)
             
     figRows = len(regressionModelL)
         
     # Set the columns to include
-    if multiProjectComparisonD['featureImportance']['apply']:
+    if multiProjectComparisonD['modelling']['featureImportance']['apply']:
         
-        if multiProjectComparisonD['featureImportance']['permutationImportance']['apply']:
+        if multiProjectComparisonD['modelling']['featureImportance']['permutationImportance']['apply']:
         
             multCompPlotsColumnD['permutationImportance'] = len(multCompPlotIndexL)
             multCompPlotIndexL.append('permutationImportance')
-              
-        if multiProjectComparisonD['featureImportance']['coefficientImportance']['apply']:
+        
+        if multiProjectComparisonD['modelling']['featureImportance']['treeBasedImportance']['apply']:
+        
+            multCompPlotsColumnD['treeBasedImportance'] = len(multCompPlotIndexL)
+            multCompPlotIndexL.append('treeBasedImportance')
+                
+        if multiProjectComparisonD['modelling']['featureImportance']['coefficientImportance']['apply']:
         
             multCompPlotsColumnD['coefficientImportance'] = len(multCompPlotIndexL)
             multCompPlotIndexL.append('coefficientImportance')
             
-        if multiProjectComparisonD['featureImportance']['treeBasedImportance']['apply']:
         
-            multCompPlotsColumnD['treeBasedImportance'] = len(multCompPlotIndexL)
-            multCompPlotIndexL.append('treeBasedImportance')
             
-    if multiProjectComparisonD['modelTests']['apply']:
+    if multiProjectComparisonD['modelling']['modelTests']['apply']:
         
-        if multiProjectComparisonD['modelTests']['trainTest']['apply']:
+        if multiProjectComparisonD['modelling']['modelTests']['trainTest']['apply']:
         
             multCompPlotsColumnD['trainTest'] = len(multCompPlotIndexL)
             multCompPlotIndexL.append('trainTest')
             
-        if multiProjectComparisonD['modelTests']['Kfold']['apply']:
+        if multiProjectComparisonD['modelling']['modelTests']['Kfold']['apply']:
         
             multCompPlotsColumnD['Kfold'] = len(multCompPlotIndexL)
             multCompPlotIndexL.append('Kfold')
@@ -1842,8 +2111,6 @@ def SetMultCompPlots(multiProjectComparisonD, targetFeatureSymbolsD, figCols):
         
         for index in multCompPlotIndexL:
             
-            #print ('        index',index)
-
             multCompFig[targetFeature][index], multCompAxs[targetFeature][index] = plt.subplots(figRows, figCols, figsize=(figSizeX, figSizeY))
 
             if multiProjectComparisonD['plot']['tightLayout']:
@@ -1911,6 +2178,605 @@ def SetMultCompPlots(multiProjectComparisonD, targetFeatureSymbolsD, figCols):
                                           
     return (multCompFig, multCompAxs, multCompPlotsColumnD)
 
+def PlotOutlierDetect(plotLayout, plotFPN,
+         XtrainInliers, XtrainOutliers, XtestInliers, XtestOutliers,  
+         postTrainSamples, nTrainOutliers, postTestSamples, nTestOutliers,
+         detector, columnsX, targetFeature,  outlierFit, X):
+    """
+    """
+
+    outliersfig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 8), sharex=True, sharey=True )
+                
+    inScatSymb =  plotLayout.outlierDetection.scatter.inliers
+    
+    outScatSymb =  plotLayout.outlierDetection.scatter.outliers
+    
+    if plotLayout.outlierDetection.xlabel == 'auto':
+                                
+        xlabel = '%s (covariate)' %(columnsX[0])
+        
+    else:
+            
+        xlabel = plotLayout.outlierDetection.xlabel
+    
+    if plotLayout.outlierDetection.ylabel == 'auto':
+        
+        if columnsX[1] == 'target':
+            
+            ylabel = '%s (target feature)' %(targetFeature)
+        
+        else:
+            
+            ylabel = '%s (covariate)' %(columnsX[1])
+            
+    else:
+        
+        ylabel = plotLayout.outlierDetection.xlabel
+            
+    for i in range (2):
+        
+        if i == 0:
+            inliersX =  XtrainInliers[columnsX[0]]
+        
+            inliersY =  XtrainInliers[columnsX[1]]
+            
+            outliersX =  XtrainOutliers[columnsX[0]]
+            
+            outliersY =  XtrainOutliers[columnsX[1]]
+            
+            if plotLayout.outlierDetection.annotate.apply:
+    
+                if plotLayout.outlierDetection.annotate.train == 'auto':
+                 
+                    txtStr = 'Inlier/outlier samples\n  in: %s, out: %s\n  method: %s' %(postTrainSamples, nTrainOutliers,
+                                                detector)
+                    
+                else:
+                    
+                    txtStr = plotLayout.outlierDetection.annotate.train
+                
+            title = 'Outlier detection training dataset'
+            
+        else:
+            
+            inliersX =  XtestInliers[columnsX[0]]
+        
+            inliersY =  XtestInliers[columnsX[1]]
+            
+            outliersX =  XtestOutliers[columnsX[0]]
+            
+            outliersY =  XtestOutliers[columnsX[1]]
+            
+            if plotLayout.outlierDetection.annotate.apply:
+    
+                if plotLayout.outlierDetection.annotate.test == 'auto':
+                 
+                    txtStr = 'Inlier/outlier samples\n  in: %s, out: %s\n  method: %s' %(postTestSamples, nTestOutliers,
+                                                detector)
+                    
+                else:
+                    
+                    txtStr = plotLayout.outlierDetection.annotate.train
+
+            title = 'Outlier detection test dataset'
+        
+        DecisionBoundaryDisplay.from_estimator(
+            outlierFit,
+            X,
+            response_method="decision_function",
+            plot_method="contour",
+            colors=plotLayout.outlierDetection.isolines.color,
+            levels=[0],
+            ax=ax[i],
+        )
+                         
+        ax[i].scatter(inliersX, inliersY, color=inScatSymb.color, alpha=inScatSymb.alpha, s=inScatSymb.size)
+        ax[i].scatter(outliersX, outliersY, color=outScatSymb.color, alpha=outScatSymb.alpha, s=outScatSymb.size)
+        
+        ax[i].set(
+            xlabel= xlabel,
+            ylabel= ylabel,
+            title= title,
+        )
+        
+        ax[i].annotate(txtStr,
+               (plotLayout.outlierDetection.annotate.x,
+                plotLayout.outlierDetection.annotate.y),
+               xycoords = 'axes fraction' )
+    
+    # Set supTitle
+    if plotLayout.outlierDetection.supTitle:
+        '''
+        if plotLayout.outlierDetection.supTitle == 'auto':
+            
+            outliersfig.suptitle('Outlier detection and removal')
+        
+        else:
+    
+            outliersfig.suptitle(plotLayout.outlierDetection.supTitle)
+        '''
+           
+        if plotLayout.outlierDetection.supTitle:
+            
+            if '%s' in plotLayout.outlierDetection.supTitle:
+                
+                suptitle = plotLayout.outlierDetection.supTitle.replace('%s',targetFeature)
+                
+                outliersfig.suptitle(suptitle)
+        
+        else:
+            
+            outliersfig.suptitle(plotLayout.outlierDetection.supTitle)
+    
+    # Set tight layout if requested
+    if plotLayout.tightLayout:
+    
+        outliersfig.tight_layout() 
+                        
+    if plotLayout.screenShow:
+    
+        plt.show()
+    
+    if plotLayout.savePng:
+        
+        outliersfig.savefig(plotFPN)
+        
+def PlotVarianceThreshold(plotLayout, plotFPN,
+         X_train, X_test, retainL, discardL, columns, scaler):
+    """ 
+    """
+    
+    # TODO: plot variance on right y-axis
+    from math import ceil
+    
+    # Get the plot layout arguments
+    maxSpectra = plotLayout.maxSpectra
+            
+    subplotTitles = plotLayout.varianceThreshold.subplotTitles
+    
+    # Get the bands to plot
+    plotskipStep = ceil( (len(X_train.index)-1)/maxSpectra )
+    
+    # ttration = trian-test ratio - only for adjusting colorramp
+    ttratio = plotskipStep / ceil( (len(X_test.index)-1)/maxSpectra)
+        
+    trainSelectDF = X_train[ retainL ]
+        
+    testSelectDF = X_test[ retainL ]
+    
+    xlabels = list(columns.keys())
+            
+    xaxislabel = 'wavelength'
+        
+    yaxislabel = 'reflectance'
+    
+    if xlabels[0].startswith('pc-'):
+        
+        xaxislabel = 'principal components'
+        
+        yaxislabel = 'eigenvalues'
+        
+    elif xlabels[0].startswith('d'):
+                
+        yaxislabel = 'derivatives'
+    
+    # Create empty dict to hold the data
+    subplotsD = {}
+    
+    subplotsD['input'] = {}
+    
+    subplotsD['selected'] = {}
+        
+    subplotsD['input']['train'] = {'label': 'Training data (input)',
+                                      'DF' : X_train}
+    
+    subplotsD['input']['test'] = { 'label': 'Test data (input)',
+                                      'DF' : X_test}
+    
+    subplotsD['selected']['train'] = {'label': 'Selected covariates',
+                                      'DF' : trainSelectDF}
+    
+    subplotsD['selected']['test'] = { 'label': 'Selected covariates',
+                                      'DF' : testSelectDF}
+
+    #fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(self.spectraPlot.subfigs.figSize.x, self.spectraPlot.subfigs.figSize.y), sharex=True  )
+    varianceThresholdPlot, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey='row' )
+        
+    n = int(len(X_train.index)/plotskipStep)+2
+        
+    # With n bands known, create the colorRamp
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
+    
+    nCovars = len(retainL)+len(discardL)
+    
+    annotateStrD = {0:'', 1:'', 2:'',}
+   
+    if plotLayout.varianceThreshold.annotate.input:          
+        if plotLayout.varianceThreshold.annotate.input == 'auto':
+            annotateStrD[0] = 'Input bands\n  %s covars\n  showing every %s band' %(nCovars, plotskipStep)
+        else:
+            annotateStrD[0] = plotLayout.varianceThreshold.annotate.input
+            
+    if plotLayout.varianceThreshold.annotate.standard:          
+        if plotLayout.varianceThreshold.annotate.standard == 'auto':
+            annotateStrD[1] = 'Selected bands \n  %s selected; %s discarded\n  showing every %s band' %(len(retainL), len(discardL), plotskipStep)
+        else:
+            annotateStrD[1] = plotLayout.varianceThreshold.annotate.standard
+    
+    plotStyle =  GetPlotStyle(plotLayout)
+    
+    for r, key in enumerate(subplotsD):
+
+        if r == 1:
+                
+                for c in range(len(subplotsD[key])):
+                
+                    ax[r][c].set(xlabel=xaxislabel)
+        
+        for c, subplotkey in enumerate(subplotsD[key]):
+            
+            plotcols = [item for item in subplotsD[key][subplotkey]['DF'].columns ]
+            
+            plotcolNr = [columns[key] for key in plotcols]
+                     
+            ax[r][c].annotate(annotateStrD[r],
+                           (plotLayout.varianceThreshold.annotate.x,
+                            plotLayout.varianceThreshold.annotate.y),
+                           xycoords = 'axes fraction' )
+           
+            ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
+            
+            if c == 0:
+                
+                if scaler == 'None':
+                  
+                    #ax[r][c].set(ylabel=plotLayout.varianceThreshold.ylabels[r])
+                    ax[r][c].set(ylabel=yaxislabel)
+                    
+                else:
+                    
+                    ylabel = '%s %s' %(scaler, yaxislabel) 
+                    
+                    ax[r][c].set(ylabel=ylabel)
+                                           
+            # Loop over the spectra
+            i = -1
+        
+            n = 0
+            
+            for index, row in subplotsD[key][subplotkey]['DF'].iterrows():
+                
+                i += 1
+                
+                if i % plotskipStep == 0:
+                                         
+                    if c == 0:
+
+                        ax[r][c].plot(plotcolNr, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
+                        
+                        if r == 0:
+                            
+                            ax[1][c].plot(plotcolNr, row, plotStyle, color='grey', ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
+                    else:
+                        
+                        m = ceil(n*ttratio)
+                        
+                        ax[r][c].plot(plotcolNr, row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+
+                        if r == 0:
+                            
+                            ax[1][c].plot(plotcolNr, row, plotStyle, color='grey', ms=plotLayout.pointsize,lw=plotLayout.linewidth) 
+           
+                    n += 1
+                      
+            if r == 1 and plotLayout.varianceThreshold.axvline:
+                
+                for xvalue in discardL:
+                    
+                    ax[1][c].axvline(x=columns[xvalue], color='grey')           
+                                   
+    # Set supTitle
+    if plotLayout.varianceThreshold.supTitle:
+        
+        if plotLayout.varianceThreshold.supTitle == 'auto':
+            
+            varianceThresholdPlot.suptitle('Variance threshold covariate selection')
+        
+        else:
+    
+            varianceThresholdPlot.suptitle(plotLayout.varianceThreshold.supTitle)
+    
+    # Set tight layout if requested
+    if plotLayout.tightLayout:
+    
+        varianceThresholdPlot.tight_layout()
+ 
+    if plotLayout.screenShow:
+    
+        plt.show()
+    
+    if plotLayout.savePng:
+  
+        varianceThresholdPlot.savefig(plotFPN)   # save the figure to file
+             
+    plt.close(varianceThresholdPlot)
+
+def GetAxisLabels(xlabels):
+    '''
+    '''
+    
+    xaxislabel = 'wavelength'
+        
+    yaxislabel = 'reflectance'
+    
+    if xlabels[0].startswith('pc-'):
+        
+        xaxislabel = 'principal components'
+        
+        yaxislabel = 'eigenvalues'
+        
+    elif xlabels[0].startswith('d'):
+                
+        yaxislabel = 'derivatives'
+    
+    return (xaxislabel, yaxislabel)
+
+def SetAxvspan(discardL, columns):
+    '''
+    '''
+    columnKeys = list(columns.keys())
+
+    axvspanD = {}
+ 
+    firstDiscard = True
+    
+    for i,item in enumerate(columns):
+        
+        if item in discardL:
+            
+            if i == 0:
+                
+                spanBegin = columns[columnKeys[0]]
+                #spanEnd = columns[columnKeys[i+1]]
+                spanEnd = (columns[columnKeys[i+1]]+columns[columnKeys[i]])/2
+                
+                
+            elif i == len(columns)-1:
+                
+                spanBegin = (columns[columnKeys[i-1]]+columns[columnKeys[i]])/2
+                spanEnd = columns[columnKeys[i]]
+                
+            else:
+                
+                #spanBegin = columns[columnKeys[i-1]]
+                #spanEnd = columns[columnKeys[i+1]]
+                
+                spanBegin = (columns[columnKeys[i-1]]+columns[columnKeys[i]])/2
+                spanEnd = (columns[columnKeys[i+1]]+columns[columnKeys[i]])/2
+                
+            if firstDiscard:
+            
+                axvspanD[item] = {'begin': spanBegin, 'end':spanEnd}
+                
+                firstDiscard = False
+                
+                previousDiscard = item
+                
+            else:
+                
+                if axvspanD[previousDiscard]['end'] >= spanBegin:
+                    
+                    axvspanD[previousDiscard]['end'] = spanEnd
+                
+                else:
+               
+                    axvspanD[item] = {'begin': spanBegin, 'end':spanEnd}
+                    
+                    previousDiscard = item
+        
+    return axvspanD  
+                       
+def PlotCoviariateSelection(selector, selectorSymbolisation,  plotLayout, plotFPN,
+         X_train, X_test, retainL, discardL, columns, targetFeatureName, regressorName='None', scaler='None'):
+    """ Plot for all covariate selections
+    """
+    
+    # TODO: plot variance on right y-axis
+    from math import ceil
+    
+    if plotLayout.axvspan.apply:
+        
+        axvspanD = SetAxvspan(discardL, columns)
+        
+    # Get the plot layout arguments
+    maxSpectra = plotLayout.maxSpectra
+            
+    subplotTitles = plotLayout.varianceThreshold.subplotTitles
+    
+    # Get the bands to plot
+    plotskipStep = ceil( (len(X_train.index)-1)/maxSpectra )
+    
+    # ttration = trian-test ratio - only for adjusting colorramp
+    ttratio = plotskipStep / ceil( (len(X_test.index)-1)/maxSpectra)
+        
+    trainSelectDF = X_train[ retainL ]
+        
+    testSelectDF = X_test[ retainL ]
+    
+    xlabels = list(columns.keys())
+    
+    xaxislabel, yaxislabel = GetAxisLabels(xlabels)
+    
+    # Create empty dict to hold the data
+    subplotsD = {}
+    
+    subplotsD['input'] = {}
+    
+    subplotsD['selected'] = {}
+    
+    subplotsD['discarded'] = {}
+    
+    subplotsD['input']['train'] = {'label': 'Training data (input)',
+                                      'DF' : X_train}
+    
+    subplotsD['input']['test'] = { 'label': 'Test data (input)',
+                                      'DF' : X_test}
+    
+    subplotsD['selected']['train'] = {'label': 'Selected covariates',
+                                      'DF' : trainSelectDF}
+    
+    subplotsD['selected']['test'] = { 'label': 'Selected covariates',
+                                      'DF' : testSelectDF}
+    
+    selectPlotFig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8), sharex=True, sharey='row' )
+        
+    n = int(len(X_train.index)/plotskipStep)+2
+        
+    # With n bands known, create the colorRamp
+    slicedCM = SetcolorRamp(n, plotLayout.colorRamp)
+    
+    nCovars = len(retainL)+len(discardL)
+    
+    annotateStrD = {0:'', 1:'', 2:'',}
+   
+    if selectorSymbolisation.annotate.input:          
+        if selectorSymbolisation.annotate.input == 'auto':
+ 
+            annotateStrD[0] = 'Input bands\n  %s covars\n  showing every %s band' %(nCovars, plotskipStep)
+          
+        else:
+            annotateStrD[0] = selectorSymbolisation.annotate.input
+    if selectorSymbolisation.annotate.output:
+          
+              
+        if selectorSymbolisation.annotate.output == 'auto':
+            if regressorName == 'None':
+                annotateStrD[1] = 'Target feature: %s\n   %s selected; %s discarded' %(targetFeatureName, len(retainL), len(discardL))
+            else:
+                annotateStrD[1] = 'Target feature: %s\n  Regressor: %s\n  %s selected; %s discarded' %(targetFeatureName, regressorName, len(retainL), len(discardL))
+        else:
+            annotateStrD[1] = selectorSymbolisation.annotate.output
+    
+    plotStyle =  GetPlotStyle(plotLayout)
+    
+    for r, key in enumerate(subplotsD):
+
+        if r == 1: # second (last) row - set xaxis label
+                
+            for c in range(len(subplotsD[key])):
+                
+                ax[r][c].set(xlabel=xaxislabel)
+        
+        for c, subplotkey in enumerate(subplotsD[key]):
+            
+            plotcols = [item for item in subplotsD[key][subplotkey]['DF'].columns ]
+            
+            plotcolNr = [columns[k] for k in plotcols]
+                     
+            ax[r][c].annotate(annotateStrD[r],
+                           (selectorSymbolisation.annotate.x,
+                            selectorSymbolisation.annotate.y),
+                           xycoords = 'axes fraction',zorder=4 )
+           
+            ax[r][c].set( title=subplotsD[key][subplotkey]['label'])
+            
+            if c == 0:
+                
+                if scaler == 'None':
+                  
+                    ax[r][c].set(ylabel=yaxislabel)
+                    
+                else:
+                    
+                    ylabel = '%s %s' %(scaler, yaxislabel) 
+                    
+                    ax[r][c].set(ylabel=ylabel)
+                                           
+            # Loop over the spectra
+            i = -1
+        
+            n = 0
+            
+            for index, row in subplotsD[key][subplotkey]['DF'].iterrows():
+                
+                i += 1
+                
+                if i % plotskipStep == 0:
+                                         
+                    if c == 0:
+
+                        ax[r][c].plot(plotcolNr, row, plotStyle, color=slicedCM[n], ms=plotLayout.pointsize,lw=plotLayout.linewidth,zorder=2) 
+
+                        
+                        if r == 0:
+                            
+                            ax[1][c].plot(plotcolNr, row, plotStyle, color='lightgrey', ms=plotLayout.pointsize,lw=plotLayout.linewidth,zorder=1) 
+
+                    else:
+                        
+                        m = ceil(n*ttratio)
+                        
+                        ax[r][c].plot(plotcolNr, row, plotStyle, color=slicedCM[m], ms=plotLayout.pointsize,lw=plotLayout.linewidth,zorder=2) 
+
+                        if r == 0:
+                            
+                            ax[1][c].plot(plotcolNr, row, plotStyle, color='lightgrey', ms=plotLayout.pointsize,lw=plotLayout.linewidth,zorder=1) 
+           
+                    n += 1
+                  
+            if r == 1 and plotLayout.axvspan.apply:
+                
+                for span in axvspanD:
+                    
+                    ax[1][c].axvspan(axvspanD[span]['begin'], axvspanD[span]['end'], 
+                                     ymin=plotLayout.axvspan.ymin, ymax=plotLayout.axvspan.ymax, 
+                                     color=plotLayout.axvspan.color, alpha=plotLayout.axvspan.alpha,
+                                     zorder=3)           
+                                   
+    # Set supTitle
+    if selectorSymbolisation.supTitle:
+        
+        if plotLayout.varianceThreshold.supTitle == 'auto':
+            
+            if regressorName == 'None':
+                
+                suptitle = '%s covariate selection for %s' %(selector, targetFeatureName, regressorName)
+            
+            else:
+                
+                suptitle = '%s covariate selection for %s (regresson: %s)' %(selector, targetFeatureName, regressorName)
+            
+            selectPlotFig.suptitle(suptitle)
+        
+        else:
+    
+            if '%s' in selectorSymbolisation.supTitle:
+                
+                suptitle = selectorSymbolisation.supTitle.replace('%s',targetFeatureName)
+                
+                selectPlotFig.suptitle(suptitle)
+            
+            else:
+                
+                selectPlotFig.suptitle(selectorSymbolisation.supTitle)
+    
+    # Set tight layout if requested
+    if plotLayout.tightLayout:
+    
+        selectPlotFig.tight_layout()
+                 
+    if plotLayout.screenShow:
+    
+        plt.show()
+    
+    if plotLayout.savePng:
+    
+        selectPlotFig.savefig(plotFPN)   # save the figure to file
+             
+    plt.close(selectPlotFig)   
+     
 class Obj(object):
     ''' Convert json parameters to class objects
     '''
@@ -2027,7 +2893,7 @@ class Obj(object):
 
             self.specificFeatureSelection.apply = False
 
-            self.generalFeatureSelection.featureAgglomeration.apply = False
+            self.specificFeatureAgglomeration.apply = False
 
     def __iter__(self):
         '''
@@ -2076,8 +2942,78 @@ class RegressionModels:
         self.retainPrintD = {}
 
         self.tunedModD = {}
+        
+        
+    def _ExtractDataFrameX(self):
+        ''' Extract the original dataframe to X (covariate) array and y (predict) column
+        '''
 
-    def _ExtractDataFrame(self):
+        # define the list of covariates to use
+        #columnsX = [item for item in self.spectraDF.columns if item not in self.omitL]
+        columnsX = self.spectraDF.columns
+
+        columnsY = self.abundanceDf.columns
+        
+        frames = [self.spectraDF,self.abundanceDf]
+    
+        spectraDF = pd.concat(frames, axis=1)
+        
+        self.Xall = spectraDF[columnsX]
+        
+        columns = self.Xall.columns
+        
+        if '.' in columns[0]:
+            
+            XcolumnsNum = [float(item) for item in columns]
+            
+            XcolumnsStr = ["{0:.1f}".format(item) for item in XcolumnsNum]
+            
+        else:
+            
+            XcolumnsNum = [int(item) for item in columns]
+            
+            XcolumnsStr = list(map(str, XcolumnsNum))
+               
+        self.Xcolumns = dict(zip(XcolumnsStr,XcolumnsNum))
+                
+        self.Yall = spectraDF[columnsY]
+        
+        #Split the data into training and test subsets
+        self.X_train, self.X_test, self.Y_train, self.Y_test = model_selection.train_test_split(self.Xall, self.Yall, test_size=self.datasetSplit.testSize)
+          
+              
+    def _SplitDataSetTargetOld(self):
+        '''
+        '''
+        
+        #Split the data into training and test subsets
+        self.X_train, self.X_test, self.y_train, self.y_test = model_selection.train_test_split(self.Xall, self.y, test_size=self.datasetSplit.testSize)
+        
+    def _ResetDataFramesXY(self):
+        '''
+        '''
+        
+        Xcolumns = list(self.Xall.keys())
+        
+        Ycolumns = list(self.Yall.keys())
+        
+        xtrain = np.array(self.X_train)
+                    
+        xtest = np.array(self.X_test)
+                            
+        self.X_train = pd.DataFrame(xtrain, columns=Xcolumns)
+                    
+        self.X_test = pd.DataFrame(xtest, columns=Xcolumns)
+        
+        ytrain = np.array(self.Y_train)
+                    
+        ytest = np.array(self.Y_test)
+                            
+        self.Y_train = pd.DataFrame(ytrain, columns=Ycolumns)
+                    
+        self.Y_test = pd.DataFrame(ytest, columns=Ycolumns)
+        
+    def _ExtractDataFrameTarget(self):
         ''' Extract the original dataframe to X (covariate) array and y (predict) column
         '''
 
@@ -2120,7 +3056,7 @@ class RegressionModels:
         
         # Get the input spectra
         columnsX = [item for item in self.spectraDF.columns]
-        
+                
         outputWls = [float(item) for item in columnsX]
        
         # extract the covariate columns as X
@@ -2139,8 +3075,10 @@ class RegressionModels:
                  
         # If Gaussian filter
         elif self.spectraPreProcess.filtering.Gauss.sigma:
-                        
-            X1 = gaussian_filter1d(X, self.spectraPreProcess.filtering.Gauss.sigma, axis=-1, mode=self.spectraPreProcess.filtering.Gauss.mode)
+            
+            sigma = self.spectraPreProcess.filtering.Gauss.sigma / ( (wlArr[len(wlArr)-1] - wlArr[0])/(len(wlArr)-1) )
+                                    
+            X1 = gaussian_filter1d(X, sigma, axis=-1, mode=self.spectraPreProcess.filtering.Gauss.mode)
                            
             filtertxt = 'Gaussian filter'
              
@@ -2160,7 +3098,7 @@ class RegressionModels:
                         
         if extractionMode.lower() in ['none', 'no'] or beginWL >= endWL:
             
-            " No extraction"
+            "No extraction"
             
             pass
             
@@ -2174,23 +3112,7 @@ class RegressionModels:
             else:
                     
                 outputWls = np.arange(beginWL, endWL, outputBandWidth)
-     
-            '''
-            for row in self.spectraDF.values:
-                
-                spectraA = np.interp(outputWls, wlArr, row,
-                            left=self.spectraPreProcess.multifiltering.beginWaveLength[r]-halfwlstep,
-                            right=self.spectraPreProcess.multifiltering.endWaveLength[r]+halfwlstep)
-                
-                arrL.append(spectraA)
-
-            spectraA = np.asarray(arrL)
-            
-            newSpectraDF[ outputWls ] = spectraA
                             
-            self.spectraDF = deepcopy(copySpectraDF)
-            ''' 
-            
             xDF = pd.DataFrame(data=X1, columns=columnsX)
             
             arrL = []
@@ -2204,11 +3126,7 @@ class RegressionModels:
                 arrL.append(spectraA)
                 
             X1 = np.asarray(arrL)
-                    
-        #self.spectraDF = pd.DataFrame(data=X1, columns=columnsX)
-        
-        #self.X_test = pd.DataFrame(data=Xtest, columns=columnsX)
-
+                                       
         return filtertxt, outputWls, X1
     
     def _FilterPrep(self):
@@ -2216,12 +3134,11 @@ class RegressionModels:
         '''
         # Create an empty copy of the spectra DataFrame
         originalDF = self.spectraDF.copy()
-        
-        # Extract the columns bands) as floating wavelenhts   
-        columnsX = [float(item) for item in self.spectraDF.columns]
-        
+                
+        columnsNum = list(self.columns.values())
+          
         # Convert bands to array)
-        wlArr = np.asarray(columnsX)
+        wlArr = np.asarray(columnsNum)
         
         halfwlstep = self.spectraPreProcess.filtering.extraction.outputBandWidth/2
         
@@ -2237,24 +3154,24 @@ class RegressionModels:
         filtertxt, outputWls, X1 = self._Filtering(extractionMode, beginWL, endWL, outputBandWidth, wlArr, halfwlstep)
         
         if isinstance(outputWls[0], Integral):
-
-            print (outputWls)
             
             #outputWls = ["{d}".format(item) for item in outputWls]
-            outputWls = list(map(str, outputWls))
+            outputWlsStr = list(map(str, outputWls))
 
         else:
             
-            outputWls = ["{0:.2f}".format(item) for item in outputWls]
-
-
-        self.spectraDF = pd.DataFrame(data=X1, columns=outputWls)
+            outputWlsStr = ["{0:.1f}".format(item) for item in outputWls]
+            
+        # Reset self.columns
+        self.columns = dict(zip(outputWlsStr,outputWls))
+        
+        self.spectraDF = pd.DataFrame(data=X1, columns=outputWlsStr)
         
         if self.enhancementPlotLayout.filterExtraction.apply:
             
             PlotFilterExtract( self.enhancementPlotLayout, filtertxt, originalDF, self.spectraDF, self.filterExtractPlotFPN)
             
-        self.spectraDF = pd.DataFrame(data=X1, columns=outputWls)
+        self.spectraDF = pd.DataFrame(data=X1, columns=outputWlsStr)
                     
         return filtertxt
                 
@@ -2270,6 +3187,10 @@ class RegressionModels:
         
         # Cnovert bands to array)
         wlArr = np.asarray(columnsX)
+        
+        outPutWlStr = []
+        
+        outPutWlNum = []
         
         # Loop over the wavelength regions defined for filtering
         for r, rang in enumerate(self.spectraPreProcess.multifiltering.beginWaveLength):
@@ -2303,62 +3224,292 @@ class RegressionModels:
             # Run the filtering
             filtertxt, outputWls, X1 = self._Filtering(extractionMode, beginWL, endWL, outputBandWidth, wlArr, halfwlstep)
             
-            # Half the output band width to adjust the input bands to read
+            if isinstance(outputWls[0], Integral):
             
-            '''
-            if self.spectraPreProcess.multifiltering.mode == 'noendpoints':
-                
-                # Define the output wavelengths
-                outputWls = np.arange(self.spectraPreProcess.multifiltering.beginWaveLength[r]+self.spectraPreProcess.multifiltering.outputBandWidth[r], self.spectraPreProcess.multifiltering.endWaveLength[r]-1, self.spectraPreProcess.multifiltering.outputBandWidth[r])
-            
+                #outputWls = ["{d}".format(item) for item in outputWls]
+                outputWlS = list(map(str, outputWls))
+    
             else:
-                
-                # Define the output wavelengths
-                outputWls = np.arange(self.spectraPreProcess.multifiltering.beginWaveLength[r], self.spectraPreProcess.multifiltering.endWaveLength[r]+1, self.spectraPreProcess.multifiltering.outputBandWidth[r])
-     
-            arrL = []
+                    
+                outputWlS = ["{0:.1f}".format(item) for item in outputWls]
+                    
+            outPutWlNum.extend(outputWls)
             
-            for row in self.spectraDF.values:
-                
-                spectraA = np.interp(outputWls, wlArr, row,
-                            left=self.spectraPreProcess.multifiltering.beginWaveLength[r]-halfwlstep,
-                            right=self.spectraPreProcess.multifiltering.endWaveLength[r]+halfwlstep)
-                
-                arrL.append(spectraA)
-
-            spectraA = np.asarray(arrL)
-            '''
-            
-            newSpectraDF[ outputWls ] = X1
+            outPutWlStr.extend(outputWlS)
+        
+            # Add filtered+extrad range with columns as strings
+            newSpectraDF[ outputWlS ] = X1
+           
+        # reset columns 
+        self.columns = dict(zip(outPutWlStr, outPutWlNum))
                             
-            self.spectraDF = deepcopy(copySpectraDF)
+        self.spectraDF = deepcopy(copySpectraDF)
             
+        if self.enhancementPlotLayout.filterExtraction.apply:
+            
+            PlotFilterExtract( self.enhancementPlotLayout, filtertxt, self.spectraDF, newSpectraDF, self.filterExtractPlotFPN)
+
         # Set the fitlered spectra to spectraDF
         self.spectraDF = newSpectraDF
-            
-        return 'multi'   
-        
-    def _SplitDataSet(self):
-        '''
-        '''
-        
-        #Split the data into training and test subsets
-        self.X_train, self.X_test, self.y_train, self.y_test = model_selection.train_test_split(self.Xall, self.y, test_size=self.datasetSplit.testSize)
 
-        self.X_train.reset_index()
-        self.X_test.reset_index()
-        self.y_train.reset_index()
-        self.y_test.reset_index()
+        return 'multi'   
+
         
     def _ResetRegressorXyDF(self):
         '''
         '''
 
-        self.X_train_regressor =  deepcopy(self.X_train)
-        self.X_test_regressor =  deepcopy(self.X_test)
-        self.y_train_regressor =  deepcopy(self.y_train)
-        self.y_test_regressor =  deepcopy(self.y_test)
+        self.X_train_R =  deepcopy(self.X_train_T)
+        self.X_test_R =  deepcopy(self.X_test_T)
+        self.y_train_r =  deepcopy(self.y_train_t)
+        self.y_test_r =  deepcopy(self.y_test_t)
+        
+        self.X_columns_R = deepcopy(self.X_columns_T)
+                       
+    
             
+    def _CheckParams(self, jsonProcessFN):
+        ''' Check parameters
+        '''
+        
+        if not hasattr(self,'targetFeatures'):
+            exitStr = 'Exiting: the modelling process file %s\n    has not targetFeature' %(jsonProcessFN)
+            exit(exitStr)
+        
+    def _RegrModTrainTest(self, multCompAxs):
+        '''
+        '''
+
+        #Retrieve the model name and the model itself
+        name,model = self.regrModel
+
+        #Fit the model
+        model.fit(self.X_train_R, self.y_train_r)
+
+        #Predict the independent variable in the test subset
+        predict = model.predict(self.X_test_R)
+        
+        r2_total = r2_score(self.y_test_r, predict)
+        
+        rmse_total = sqrt(mean_squared_error(self.y_test_r, predict))
+        
+        medae_total = median_absolute_error(self.y_test_r, predict)
+        
+        mae_total = mean_absolute_error(self.y_test_r, predict)
+        
+        mape_total = mean_absolute_percentage_error(self.y_test_r, predict)
+        
+        
+
+        self.trainTestResultD[self.targetFeature][name] = {'rmse':rmse_total,
+                                                           'mae':mae_total,
+                                                           'medae': medae_total,
+                                                           'mape':mape_total,
+                                                           'r2': r2_total,
+                                                           'hyperParameterSetting': self.paramD['modelling']['regressionModels'][name]['hyperParams'],
+                                                           'pickle': self.trainTestPickleFPND[self.targetFeature][name]
+                                                           }
+        
+        self.trainTestSummaryD[self.targetFeature][name] = {'rmse':rmse_total,
+                                                           'mae':mae_total,
+                                                           'medae': medae_total,
+                                                           'mape':mape_total,
+                                                           'r2': r2_total,
+                                                           }
+        
+        # Set regressor scores to 3 decimals
+        self.trainTestResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestResultD[self.targetFeature][name].items()}
+
+        self.trainTestSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestSummaryD[self.targetFeature][name].items()}
+
+        # Save the complete model with cPickle
+        pickle.dump(model, open(self.trainTestPickleFPND[self.targetFeature][name],  'wb'))
+
+        if self.verbose:
+
+            infoStr =  '\n                trainTest Model: %s\n' %(name)
+            
+            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
+            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
+            
+            if self.verbose > 1:
+
+                infoStr += '                    Mean absolute error (MAE) total: %.2f\n' %( mae_total)
+    
+                infoStr += '                    Mean absolute percent error (MAPE) total: %.2f\n' %( mape_total)
+    
+                infoStr += '                    Median absolute error (MedAE) total: %.2f\n' %( medae_total)
+                            
+                infoStr += '                    hyperParams: %s\n' %(self.paramD['modelling']['regressionModels'][name]['hyperParams'])
+            
+            print (infoStr)
+                    
+        if self.modelPlot.apply:
+            txtstr = 'nspectra: %s\n' %(self.Xall.shape[0])
+            txtstr += 'nbands: %s\n' %(self.Xall.shape[1])
+            #txtstr += 'min wl: %s\n' %(self.bandL[0])
+            #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
+            #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
+            #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
+
+            #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
+            suptitle = '%s train/test model (testsize = %s)' %(self.targetFeature, self.datasetSplit.testSize)
+            title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
+                      % {'mod':name,'rmse':mean_squared_error(self.y_test_r, predict),'r2': r2_score(self.y_test_r, predict)} )
+
+            txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nnTrain: %(i)d\nnTest: %(j)d' \
+                      % {'rmse':self.trainTestResultD[self.targetFeature][name]['rmse'],
+                         'r2': self.trainTestResultD[self.targetFeature][name]['r2'],
+                         'i': self.X_train_R.shape[0], 'j': self.X_test_R.shape[0]})
+
+            self._PlotRegr(self.y_test_r, predict, suptitle, title, txtstr, '',name, 'trainTest', multCompAxs)
+
+    def _RegrModKFold(self, multCompAxs):
+        """
+        """
+
+        #Retrieve the model name and the model itself
+        name,model = self.regrModel
+
+        predict = model_selection.cross_val_predict(model, self.X, self.y, cv=self.modelling.modelTests.Kfold.folds)
+
+        rmse_total = sqrt(mean_squared_error(self.y, predict))
+
+        r2_total = r2_score(self.y, predict)
+        
+        scoring = 'r2'
+
+        r2_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+        
+        scoring = 'neg_mean_absolute_error'
+        
+        mae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_mean_absolute_percentage_error'
+        
+        mape_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_median_absolute_error'
+        
+        medae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        scoring = 'neg_root_mean_squared_error'
+        
+        rmse_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
+
+        self.KfoldResultD[self.targetFeature][name] = {'rmse_total': rmse_total,
+                                                       'r2_total': r2_total,
+                                                       
+                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
+                                                       'rmse_folded_std': rmse_folded.std(),
+                                                       
+                                                       'mae_folded_mean': -1*mae_folded.mean(),
+                                                       'mae_folded_std': mae_folded.std(),
+                                                       
+                                                       'mape_folded_mean': -1*mape_folded.mean(),
+                                                       'mape_folded_std': mape_folded.std(),
+                                                       
+                                                       'medae_folded_mean': medae_folded.mean(),
+                                                       'medae_folded_std': medae_folded.std(),
+                                                       
+                                                        'r2_folded_mean': r2_folded.mean(),
+                                                        'r2_folded_std': r2_folded.std(),
+                                                        'hyperParameterSetting': self.paramD['modelling']['regressionModels'][name]['hyperParams'],
+                                                        'pickle': self.KfoldPickleFPND[self.targetFeature][name]
+                                                        }
+        
+        self.KfoldSummaryD[self.targetFeature][name] = {'rmse_total': rmse_total,
+                                                       'r2_total': r2_total,
+                                                       
+                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
+                                                       'rmse_fodled_std': rmse_folded.std(),
+                                                       
+                                                       'mae_folded_mean': -1*mae_folded.mean(),
+                                                       'mae_folded_std': mae_folded.std(),
+                                                       
+                                                       'mape_folded_mean': -1*mape_folded.mean(),
+                                                       'mape_folded_std': mape_folded.std(),
+                                                       
+                                                
+                                                       'medae_folded_mean': medae_folded.mean(),
+                                                       'medae_folded_std': medae_folded.std(),
+                                                       
+                                                 
+                                                        'r2_folded_mean': r2_folded.mean(),
+                                                        'r2_folded_std': r2_folded.std(),
+                                                        }
+        
+        # Set regressor scores to 3 decimals
+        self.KfoldResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldResultD[self.targetFeature][name].items()}
+
+        self.KfoldSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldSummaryD[self.targetFeature][name].items()}
+
+        # Save the complete model with cPickle
+        pickle.dump(model, open(self.KfoldPickleFPND[self.targetFeature][name],  'wb'))
+
+        if self.verbose:
+
+            infoStr =  '\n                Kfold Model: %s\n' %(name)
+            
+            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
+            
+            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
+            
+            if self.verbose > 1:
+            
+                infoStr += '                    RMSE folded: %.2f (%.2f) \n' %( -1*rmse_folded.mean(),  rmse_folded.std())
+                
+                infoStr += '                    Mean absolute error (MAE) folded: %.2f (%.2f) \n' %( -1*mae_folded.mean(),  mae_folded.std())
+    
+                infoStr += '                    Mean absolute percent error (MAPE) folded: %.2f (%.2f) \n' %( -1*mape_folded.mean(),  mape_folded.std())
+    
+                infoStr += '                    Median absolute error (MedAE) folded: %.2f (%.2f) \n' %( -1*medae_folded.mean(),  medae_folded.std())
+    
+                infoStr += '                    Variance (r2) score folded: %.2f (%.2f) \n' %( r2_folded.mean(),  r2_folded.std())
+
+                infoStr += '                    hyperParams: %s\n' %(self.paramD['modelling']['regressionModels'][name]['hyperParams'])
+
+            print (infoStr)
+            
+        txtstr = 'nspectra: %s\n' %(self.X.shape[0])
+        txtstr += 'nbands: %s\n' %(self.X.shape[1])
+        #txtstr += 'min wl: %s\n' %(self.bandL[0])
+        #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
+        #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
+        #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
+
+        #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
+        suptitle = '%s Kfold model (nfolds = %s)' %(self.targetFeature, self.modelling.modelTests.Kfold.folds)
+        title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
+                  % {'mod':name,'rmse':rmse_total,'r2': r2_total} )
+
+        txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nSamples: %(n)d' \
+                      % {'rmse':self.KfoldResultD[self.targetFeature][name]['rmse_total'],
+                         'r2': self.KfoldResultD[self.targetFeature][name]['r2_total'],
+                         'n': self.X.shape[0]} )
+
+        self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold', multCompAxs)
+
+    def _PyplotArgs(self, pyplotAttrs, argD):
+                        
+        args = [a for a in dir(self.featureImportancePlot.xticks) if not a.startswith('_')]
+        
+        argD = {"axis":"x"}
+        
+        for arg in args:
+            
+            val = '%s' %(getattr(pyplotAttrs, arg))
+            
+            if (val.replace('.','')).isnumeric():
+                
+                argD[arg] = getattr(pyplotAttrs, arg)
+            
+            else:
+
+                argD[arg] = val
+                
+        return argD
+    
     def _SetTargetFeatureSymbol(self):
         '''
         '''
@@ -2392,11 +3543,11 @@ class RegressionModels:
     def _PlotRegr(self, obs, pred, suptitle, title, txtstr,  txtstrHyperParams, regrModel, modeltest, multCompAxs):
         '''
         '''
-
+        
         if isinstance(obs,pd.DataFrame):
             
             exit('obs is a dataframe, must be a dataseries')
-        
+
         if self.modelPlot.singles.apply:
             
             fig, ax = plt.subplots()
@@ -2411,18 +3562,18 @@ class RegressionModels:
             plt.title(title)
             ax.text(obs.min(), (obs.max()-obs.min())*0.8, txtstr, fontdict=None,  wrap=True)
 
- 
             if self.modelPlot.singles.screenShow:
 
                 plt.show()
 
             if self.modelPlot.singles.savePng:
                 
-                print (self.imageFPND[self.targetFeature][regrModel][modeltest])
+                self.figLibL.append(self.imageFPND[self.targetFeature][regrModel][modeltest])
 
                 fig.savefig(self.imageFPND[self.targetFeature][regrModel][modeltest])
-
+                
             plt.close(fig=fig)
+
 
         if self.modelPlot.rows.apply:
 
@@ -2489,9 +3640,6 @@ class RegressionModels:
                 # modeltest is either trainTest of Kfold
                 if modeltest in self.modelPlot.rows.regressionModels.columns:
 
-                    #self.columnAxs[self.regrModel][self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  color=self.featureSymbolColor,
-                    #       s=self.featureSymbolSize, marker=self.featureSymbolMarker)
-
                     if (len(self.regressorModels)) == 1:
 
                         self.columnAxs[self.targetFeature][self.regressionModelPlotColumnD[modeltest] ].scatter(obs, pred, edgecolors=(0, 0, 0),  
@@ -2522,7 +3670,6 @@ class RegressionModels:
 
                         self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].yaxis.set_label_position("right")
 
-
                     # if at last column
                     if self.regressionModelPlotColumnD[modeltest] == len(self.modelPlot.rows.targetFeatures.columns)-1:
 
@@ -2536,7 +3683,6 @@ class RegressionModels:
 
                                 self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
 
-
                         else:
 
                             if (len(self.regressorModels)) == 1:
@@ -2546,7 +3692,6 @@ class RegressionModels:
                             else:
 
                                 self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_ylabel('Predictions')
-
 
                     # if at last row
                     if self.regrN == self.nRegrModels-1:
@@ -2569,12 +3714,13 @@ class RegressionModels:
 
                             self.columnAxs[self.targetFeature][self.regrN, self.regressionModelPlotColumnD[modeltest]].set_xlabel('Observations')
                     '''
-                            
+                  
         if self.multcompplot:
  
             index = modeltest
             columnNr = self.modelNr
             
+
             if (len(self.regressorModels)) == 1: # only 1 row in subplot
 
                 multCompAxs[self.targetFeature][index][columnNr].scatter(obs, pred, edgecolors=(0, 0, 0),  
@@ -2629,8 +3775,6 @@ class RegressionModels:
 
                     multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel('Predictions')
 
-
-
             # if at last row
             if self.regrN == self.nRegrModels-1:
 
@@ -2650,36 +3794,36 @@ class RegressionModels:
 
         if hasattr(self.modelling.regressionModels, 'OLS') and self.modelling.regressionModels.OLS.apply:
 
-            self.regressorModels.append(('OLS', linear_model.LinearRegression(**self.jsonparamsD['modelling']['regressionModels']['OLS']['hyperParams'])))
+            self.regressorModels.append(('OLS', linear_model.LinearRegression(**self.paramD['modelling']['regressionModels']['OLS']['hyperParams'])))
 
             self.modelSelectD['OLS'] = []
 
         if hasattr(self.modelling.regressionModels, 'TheilSen') and self.modelling.regressionModels.TheilSen.apply:
 
-            self.regressorModels.append(('TheilSen', linear_model.TheilSenRegressor(**self.jsonparamsD['modelling']['regressionModels']['OLS']['hyperParams'])))
+            self.regressorModels.append(('TheilSen', linear_model.TheilSenRegressor(**self.paramD['modelling']['regressionModels']['OLS']['hyperParams'])))
 
             self.modelSelectD['TheilSen'] = []
 
         if hasattr(self.modelling.regressionModels, 'Huber') and self.modelling.regressionModels.Huber.apply:
 
-            self.regressorModels.append(('Huber', linear_model.HuberRegressor(**self.jsonparamsD['modelling']['regressionModels']['OLS']['hyperParams'])))
+            self.regressorModels.append(('Huber', linear_model.HuberRegressor(**self.paramD['modelling']['regressionModels']['OLS']['hyperParams'])))
 
             self.modelSelectD['Huber'] = []
 
         if hasattr(self.modelling.regressionModels, 'KnnRegr') and self.modelling.regressionModels.KnnRegr.apply:
-            self.regressorModels.append(('KnnRegr', KNeighborsRegressor( **self.jsonparamsD['modelling']['regressionModels']['KnnRegr']['hyperParams'])))
+            self.regressorModels.append(('KnnRegr', KNeighborsRegressor( **self.paramD['modelling']['regressionModels']['KnnRegr']['hyperParams'])))
             self.modelSelectD['KnnRegr'] = []
 
         if hasattr(self.modelling.regressionModels, 'DecTreeRegr') and self.modelling.regressionModels.DecTreeRegr.apply:
-            self.regressorModels.append(('DecTreeRegr', DecisionTreeRegressor(**self.jsonparamsD['modelling']['regressionModels']['DecTreeRegr']['hyperParams'])))
+            self.regressorModels.append(('DecTreeRegr', DecisionTreeRegressor(**self.paramD['modelling']['regressionModels']['DecTreeRegr']['hyperParams'])))
             self.modelSelectD['DecTreeRegr'] = []
 
         if hasattr(self.modelling.regressionModels, 'SVR') and self.modelling.regressionModels.SVR.apply:
-            self.regressorModels.append(('SVR', SVR(**self.jsonparamsD['modelling']['regressionModels']['SVR']['hyperParams'])))
+            self.regressorModels.append(('SVR', SVR(**self.paramD['modelling']['regressionModels']['SVR']['hyperParams'])))
             self.modelSelectD['SVR'] = []
 
         if hasattr(self.modelling.regressionModels, 'RandForRegr') and self.modelling.regressionModels.RandForRegr.apply:
-            self.regressorModels.append(('RandForRegr', RandomForestRegressor( **self.jsonparamsD['modelling']['regressionModels']['RandForRegr']['hyperParams'])))
+            self.regressorModels.append(('RandForRegr', RandomForestRegressor( **self.paramD['modelling']['regressionModels']['RandForRegr']['hyperParams'])))
             self.modelSelectD['RandForRegr'] = []
 
         if hasattr(self.modelling.regressionModels, 'MLP') and self.modelling.regressionModels.MLP.apply:
@@ -2688,11 +3832,11 @@ class RegressionModels:
             # First make a pipeline with standardscaler + MLP
             mlp = make_pipeline(
                 StandardScaler(),
-                MLPRegressor( **self.jsonparamsD['modelling']['regressionModels']['MLP']['hyperParams'])
+                MLPRegressor( **self.paramD['modelling']['regressionModels']['MLP']['hyperParams'])
             )
             '''
             mlp = Pipeline([('scl', StandardScaler()),
-                    ('clf', MLPRegressor( **self.jsonparamsD['modelling']['regressionModels']['MLP']['hyperParams']) ) ])
+                    ('clf', MLPRegressor( **self.paramD['modelling']['regressionModels']['MLP']['hyperParams']) ) ])
 
             # Then add the pipeline as MLP
             self.regressorModels.append(('MLP', mlp))
@@ -2700,248 +3844,13 @@ class RegressionModels:
             self.modelSelectD['MLP'] = []
         
         if hasattr(self.modelling.regressionModels, 'Cubist') and self.modelling.regressionModels.Cubist.apply:
-            self.regressorModels.append(('Cubist', Cubist( **self.jsonparamsD['modelling']['regressionModels']['Cubist']['hyperParams'])))
+            self.regressorModels.append(('Cubist', Cubist( **self.paramD['modelling']['regressionModels']['Cubist']['hyperParams'])))
             self.modelSelectD['Cubist'] = []
-            
+        '''    
         if hasattr(self.modelling.regressionModels, 'PLS') and self.modelling.regressionModels.PLS.apply:
-            self.regressorModels.append(('PLS', PLSRegressor( **self.jsonparamsD['modelling']['regressionModels']['PLS']['hyperParams'])))
+            self.regressorModels.append(('PLS', PLSRegressor( **self.paramD['modelling']['regressionModels']['PLS']['hyperParams'])))
             self.modelSelectD['RandForRegr'] = []
-        
-    def _CheckParams(self, jsonProcessFN):
-        ''' Check parameters
         '''
-        
-        if not hasattr(self,'targetFeatures'):
-            exitStr = 'Exiting: the modelling process file %s\n    has not targetFeature' %(jsonProcessFN)
-            exit(exitStr)
-        
-    def _RegrModTrainTest(self, multCompAxs):
-        '''
-        '''
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        #Fit the model
-        model.fit(self.X_train_regressor, self.y_train_regressor)
-
-        #Predict the independent variable in the test subset
-        predict = model.predict(self.X_test_regressor)
-        
-        r2_total = r2_score(self.y_test_regressor, predict)
-        
-        rmse_total = sqrt(mean_squared_error(self.y_test_regressor, predict))
-        
-        medae_total = median_absolute_error(self.y_test_regressor, predict)
-        
-        mae_total = mean_absolute_error(self.y_test_regressor, predict)
-        
-        mape_total = mean_absolute_percentage_error(self.y_test_regressor, predict)
-        
-        
-
-        self.trainTestResultD[self.targetFeature][name] = {'rmse':rmse_total,
-                                                           'mae':mae_total,
-                                                           'medae': medae_total,
-                                                           'mape':mape_total,
-                                                           'r2': r2_total,
-                                                           'hyperParameterSetting': self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'],
-                                                           'pickle': self.trainTestPickleFPND[self.targetFeature][name]
-                                                           }
-        
-        self.trainTestSummaryD[self.targetFeature][name] = {'rmse':rmse_total,
-                                                           'mae':mae_total,
-                                                           'medae': medae_total,
-                                                           'mape':mape_total,
-                                                           'r2': r2_total,
-                                                           }
-        
-        # Set regressor scores to 3 decimals
-        self.trainTestResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestResultD[self.targetFeature][name].items()}
-
-        self.trainTestSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.trainTestSummaryD[self.targetFeature][name].items()}
-
-        # Save the complete model with cPickle
-        pickle.dump(model, open(self.trainTestPickleFPND[self.targetFeature][name],  'wb'))
-
-        if self.verbose:
-
-            infoStr =  '                trainTest Model: %s\n' %(name)
-            infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'])
-
-            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
-            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
-            
-            infoStr += '                    Mean absolute error (MAE) total: %.2f\n' %( mae_total)
-
-            infoStr += '                    Mean absolute percent error (MAPE) total: %.2f\n' %( mape_total)
-
-            infoStr += '                    Median absolute error (MedAE) total: %.2f\n' %( medae_total)
-
-            print (infoStr)
-
-        if self.modelPlot.apply:
-            txtstr = 'nspectra: %s\n' %(self.Xall.shape[0])
-            txtstr += 'nbands: %s\n' %(self.Xall.shape[1])
-            #txtstr += 'min wl: %s\n' %(self.bandL[0])
-            #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
-            #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
-            #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
-
-            #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
-            suptitle = '%s train/test model (testsize = %s)' %(self.targetFeature, self.datasetSplit.testSize)
-            title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
-                      % {'mod':name,'rmse':mean_squared_error(self.y_test_regressor, predict),'r2': r2_score(self.y_test_regressor, predict)} )
-
-            txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nnTrain: %(i)d\nnTest: %(j)d' \
-                      % {'rmse':self.trainTestResultD[self.targetFeature][name]['rmse'],
-                         'r2': self.trainTestResultD[self.targetFeature][name]['r2'],
-                         'i': self.X_train_regressor.shape[0], 'j': self.X_test_regressor.shape[0]})
-
-            self._PlotRegr(self.y_test_regressor, predict, suptitle, title, txtstr, '',name, 'trainTest', multCompAxs)
-
-    def _RegrModKFold(self, multCompAxs):
-        """
-        """
-
-        #Retrieve the model name and the model itself
-        name,model = self.regrModel
-
-        predict = model_selection.cross_val_predict(model, self.X, self.y, cv=self.modelling.modelTests.Kfold.folds)
-
-        rmse_total = sqrt(mean_squared_error(self.y, predict))
-
-        r2_total = r2_score(self.y, predict)
-        
-        scoring = 'r2'
-
-        r2_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
-        
-        scoring = 'neg_mean_absolute_error'
-        
-        mae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
-
-        scoring = 'neg_mean_absolute_percentage_error'
-        
-        mape_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
-
-        scoring = 'neg_median_absolute_error'
-        
-        medae_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
-
-        scoring = 'neg_root_mean_squared_error'
-        
-        rmse_folded = model_selection.cross_val_score(model, self.X, self.y, cv=6, scoring=scoring)
-
-        self.KfoldResultD[self.targetFeature][name] = {'rmse_total': rmse_total,
-                                                       'r2_total': r2_total,
-                                                       
-                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
-                                                       'rmse_folded_std': rmse_folded.std(),
-                                                       
-                                                       'mae_folded_mean': -1*mae_folded.mean(),
-                                                       'mae_folded_std': mae_folded.std(),
-                                                       
-                                                       'mape_folded_mean': -1*mape_folded.mean(),
-                                                       'mape_folded_std': mape_folded.std(),
-                                                       
-                                                       'medae_folded_mean': medae_folded.mean(),
-                                                       'medae_folded_std': medae_folded.std(),
-                                                       
-                                                        'r2_folded_mean': r2_folded.mean(),
-                                                        'r2_folded_std': r2_folded.std(),
-                                                        'hyperParameterSetting': self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'],
-                                                        'pickle': self.KfoldPickleFPND[self.targetFeature][name]
-                                                        }
-        
-        self.KfoldSummaryD[self.targetFeature][name] = {'rmse_total': rmse_total,
-                                                       'r2_total': r2_total,
-                                                       
-                                                       'rmse_folded_mean': -1*rmse_folded.mean(),
-                                                       'rmse_fodled_std': rmse_folded.std(),
-                                                       
-                                                       'mae_folded_mean': -1*mae_folded.mean(),
-                                                       'mae_folded_std': mae_folded.std(),
-                                                       
-                                                       'mape_folded_mean': -1*mape_folded.mean(),
-                                                       'mape_folded_std': mape_folded.std(),
-                                                       
-                                                
-                                                       'medae_folded_mean': medae_folded.mean(),
-                                                       'medae_folded_std': medae_folded.std(),
-                                                       
-                                                 
-                                                        'r2_folded_mean': r2_folded.mean(),
-                                                        'r2_folded_std': r2_folded.std(),
-                                                        }
-        
-        # Set regressor scores to 3 decimals
-        self.KfoldResultD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldResultD[self.targetFeature][name].items()}
-
-        self.KfoldSummaryD[self.targetFeature][name] = {k:(round(v,3) if isinstance(v,float) else v) for (k,v) in self.KfoldSummaryD[self.targetFeature][name].items()}
-
-        # Save the complete model with cPickle
-        pickle.dump(model, open(self.KfoldPickleFPND[self.targetFeature][name],  'wb'))
-
-        if self.verbose:
-
-            infoStr =  '                Kfold Model: %s\n' %(name)
-            infoStr += '                    hyperParams: %s\n' %(self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'])
-            infoStr += '                    Root mean squared error (RMSE) total: %.2f\n' % rmse_total
-            infoStr += '                    Variance (r2) score total: %.2f\n' % r2_total
-            
-            infoStr += '                    RMSE folded: %.2f (%.2f) \n' %( -1*rmse_folded.mean(),  rmse_folded.std())
-            
-            infoStr += '                    Mean absolute error (MAE) folded: %.2f (%.2f) \n' %( -1*mae_folded.mean(),  mae_folded.std())
-
-            infoStr += '                    Mean absolute percent error (MAPE) folded: %.2f (%.2f) \n' %( -1*mape_folded.mean(),  mape_folded.std())
-
-            infoStr += '                    Median absolute error (MedAE) folded: %.2f (%.2f) \n' %( -1*medae_folded.mean(),  medae_folded.std())
-
-            infoStr += '                    Variance (r2) score folded: %.2f (%.2f) \n' %( r2_folded.mean(),  r2_folded.std())
-
-            print (infoStr)
-
-
-        txtstr = 'nspectra: %s\n' %(self.X.shape[0])
-        txtstr += 'nbands: %s\n' %(self.X.shape[1])
-        #txtstr += 'min wl: %s\n' %(self.bandL[0])
-        #txtstr += 'max wl: %s\n' %(self.bandL[len(self.bandL)-1])
-        #txtstr += 'bands: %s\n' %( ' ,'.join('({0})'.format(w) for w in self.aggBandL)  )
-        #txtstr += 'width wl: %s' %(int(self.bandL[1]-self.bandL[0]))
-
-        #txtstrHyperParams =  self.HPtuningtxt+'\nHyper Parameters:\n'+'\n'.join([key+': '+str(value) for key, value in self.tunedModD[name].items()])
-        suptitle = '%s Kfold model (nfolds = %s)' %(self.targetFeature, self.modelling.modelTests.Kfold.folds)
-        title = ('Model: %(mod)s; RMSE: %(rmse)2f; r2: %(r2)2f' \
-                  % {'mod':name,'rmse':rmse_total,'r2': r2_total} )
-
-        txtstr = ('RMSE: %(rmse)2f\nr2: %(r2)2f\nSamples: %(n)d' \
-                      % {'rmse':self.KfoldResultD[self.targetFeature][name]['rmse_total'],
-                         'r2': self.KfoldResultD[self.targetFeature][name]['r2_total'],
-                         'n': self.X.shape[0]} )
-
-        self._PlotRegr(self.y, predict, suptitle, title, txtstr, '',name, 'Kfold', multCompAxs)
-
-    def _PyplotArgs(self, pyplotAttrs, argD):
-                        
-        args = [a for a in dir(self.featureImportancePlot.xticks) if not a.startswith('_')]
-        
-        argD = {"axis":"x"}
-        
-        for arg in args:
-            
-            val = '%s' %(getattr(pyplotAttrs, arg))
-            
-            if (val.replace('.','')).isnumeric():
-                
-                argD[arg] = getattr(pyplotAttrs, arg)
-            
-            else:
-
-                argD[arg] = val
-                
-        return argD
-    
     def _PlotFeatureImportanceSingles(self, featureArray, importanceArray, errorArray, title, xyLabel, pngFPN):
         '''
         '''
@@ -3141,7 +4050,7 @@ class RegressionModels:
         '''
         '''
 
-        nnFS = self.X.shape
+        nnFS = self.Xall.shape
 
         text = 'tot covars: %s' %(nnFS[1])
 
@@ -3165,10 +4074,7 @@ class RegressionModels:
             #print ( self.multCompPlotsColumns[index] )
             #columnNr = getattr(self.multCompPlotsColumns, index)
             columnNr = self.modelNr
-            #print (index)
-            #print ('columnNr', columnNr)
-            #print (multCompAxs[self.targetFeature][index])
-            
+               
             if (len(self.regressorModels)) == 1: # only state the column
                 
                 multCompAxs[self.targetFeature][index][columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
@@ -3296,16 +4202,16 @@ class RegressionModels:
                     xyLabels = ['Features','Coefficient']
     
                     pngFPN = self.imageFPND[self.targetFeature][name]['featureImportance']['regressionImportance']
-    
-                    self._PlotFeatureImportanceSingles(featureArray, importanceArray, None, title, xyLabels, pngFPN)
+                                        
+                    self._PlotFeatureImportanceSingles(featureArray, np.absolute(importanceArray), None, title, xyLabels, pngFPN)
     
                 if self.modelPlot.rows.apply:
     
-                    self._PlotFeatureImportanceRows(featureArray, importanceArray, None, 'coefficientImportance','rel. coef. weight')
+                    self._PlotFeatureImportanceRows(featureArray, np.absolute(importanceArray), None, 'coefficientImportance','rel. coef. weight')
     
                 if self.multcompplot:
           
-                    self._MultCompPlotFeatureImportance(featureArray, importanceArray, None, 'coefficientImportance', 'rel. coef. weight', multCompAxs)
+                    self._MultCompPlotFeatureImportance(featureArray, np.absolute(importanceArray), None, 'coefficientImportance', 'rel. coef. weight', multCompAxs)
     
             elif name in ['KnnRegr','MLP', 'Cubist']:
                 ''' These models do not have any feature importance to report
@@ -3367,7 +4273,7 @@ class RegressionModels:
             '''
             n_repeats = self.modelling.featureImportance.permutationRepeats
 
-            permImportance = permutation_importance(model, self.X_test_regressor, self.y_test_regressor, n_repeats=n_repeats)
+            permImportance = permutation_importance(model, self.X_test_R, self.y_test_r, n_repeats=n_repeats)
     
             permImportanceMean = permImportance.importances_mean
     
@@ -3415,7 +4321,7 @@ class RegressionModels:
  
             forest = RandomForestRegressor(random_state=0)
 
-            forest.fit(self.X_test_regressor, self.y_test_regressor)
+            forest.fit(self.X_test_R, self.y_test_r)
         
             treeBasedImportanceMean = forest.feature_importances_
      
@@ -3460,10 +4366,10 @@ class RegressionModels:
         #Retrieve the model name and the model itself
         name,model = self.regrModel
         
-        columns = [item for item in self.X_train_regressor.columns]
+        columns = [item for item in self.X_train_R.columns]
         
         #Fit the model
-        model.fit(self.X_train_regressor, self.y_train_regressor)
+        model.fit(self.X_train_R, self.y_train_r)
 
         #Set the nr of feature (x-axis) items
         maxFeatures = min(self.modelling.featureImportance.reportMaxFeatures, len(columns))
@@ -3513,7 +4419,7 @@ class RegressionModels:
     
                 frames = [X_train,bandFrame]
     
-                spectraDF = pd.concat(frames, axis=1)
+                #spectraDF = pd.concat(frames, axis=1)
     
                 columns.extend(bandColumn)
 
@@ -3527,11 +4433,24 @@ class RegressionModels:
         threshold = self.generalFeatureSelection.varianceThreshold.threshold
 
         columns = [item for item in self.X_train.columns]
-
+      
         #Initiate the scaler
-        if self.generalFeatureSelection.varianceThreshold.scaler == 'MinMaxScaler':
+        if self.generalFeatureSelection.varianceThreshold.scaler == 'None':
+            
+            X_train_scaled = Xscaled = self.X_train
+            X_test_scaled = self.X_test
+                       
+        elif self.generalFeatureSelection.varianceThreshold.scaler == 'MinMaxScaler':
 
             scaler = MinMaxScaler()
+            
+            scaler.fit(self.X_train)
+            
+            #Scale the data as defined by the scaler
+            Xscaled = scaler.transform(self.X_train)
+            
+            X_train_scaled = pd.DataFrame(scaler.transform(self.X_train), columns=columns)
+            X_test_scaled = pd.DataFrame(scaler.transform(self.X_test), columns=columns)
             
         else:
             
@@ -3539,39 +4458,76 @@ class RegressionModels:
 
             exit (exitStr)
             
-        scaler.fit(self.X_train)
-
-        #Scale the data as defined by the scaler
-        Xscaled = scaler.transform(self.X_train)
-
+        if isinstance(threshold, float):
+            select = VarianceThreshold(threshold=threshold)
+   
+        elif isinstance(threshold, int):
+            select = VarianceThreshold(threshold=0.0000001)
+            
+        elif isinstance(threshold, str):
+            select = VarianceThreshold(threshold=0.0000001)
+            thresholdPercent = int(threshold[0:len(threshold)-1])
+            threshold = int(round(len(columns)*thresholdPercent/100 ))
+            
         #Initiate  VarianceThreshold
-        select = VarianceThreshold(threshold=threshold)
-
         #Fit the independent variables
         select.fit(Xscaled)
 
         #Get the selected features from get_support as a boolean list with True or False
         selectedFeatures = select.get_support()
         
+        completeL = []
+        
         #Create a list to hold discarded columns
         discardL = []
 
         #Create a list to hold retained columns
-        self.retainL = []
+        retainL = []
 
+        for sf in range(len(selectedFeatures)):
+
+            completeL.append([columns[sf],select.variances_[sf]])
+            
+            if selectedFeatures[sf]:
+                retainL.append([columns[sf],select.variances_[sf]])
+
+            else:
+                discardL.append([columns[sf],select.variances_[sf]])
+               
+        completeL.sort(key = lambda x: x[1]) 
+
+        if isinstance(threshold, int) or isinstance(threshold, str) :
+            
+            discardL = completeL[0:threshold]
+            
+            retainL = completeL[threshold:len(retainL)]
+            
+        else:
+            
+            retainL.sort(key = lambda x: x[1])
+            
+            discardL.sort(key = lambda x: x[1])
+                       
+        if self.generalFeatureSelection.varianceThreshold.onlyShowVarianceList:
+            
+            print ('                covariate variance')
+            print ('                band (variance)')
+            printL = ['%s (%.3f)'%(i[0],i[1]) for i in completeL]
+
+            for row in printL:
+                print ('                ',row)
+                
+            print('') 
+            
+            sleep(2)
+                
+            exit('Select the varianceThrehsold{"threshold"} set varianceThrehsold{"showVarianceList"}) to true and rerun')
+                
         if self.verbose:
 
             print ('            Selecting features using VarianceThreshold, threhold =',threshold)
 
             print ('                Scaling function MinMaxScaler:')
-
-        for sf in range(len(selectedFeatures)):
-
-            if selectedFeatures[sf]:
-                self.retainL.append([columns[sf],select.variances_[sf]])
-
-            else:
-                discardL.append([columns[sf],select.variances_[sf]])
                 
         self.generalFeatureSelectedD['method'] = 'varianceThreshold'
         self.generalFeatureSelectedD['threshold'] = self.generalFeatureSelection.varianceThreshold.threshold
@@ -3607,49 +4563,189 @@ class RegressionModels:
                 for row in printretainL:
                     print ('                ',row)
 
-        self.retainL = [d[0] for d in self.retainL]
+        retainL = [d[0] for d in retainL]
+        
+        discardL = [item[0] for item in discardL]
+        
+        PlotCoviariateSelection('Variance threshold', self.enhancementPlotLayout.varianceThreshold,  
+                self.enhancementPlotLayout, self.preProcessFPND['varianceThreshold'],
+                X_train_scaled, X_test_scaled, retainL, discardL, 
+                self.Xcolumns, 'all', 'None',self.generalFeatureSelection.varianceThreshold.scaler)
         
         # Remake the X_train and X_test datasets
-        self.X_train = self.X_train[ self.retainL ]
+        self.X_train = self.X_train[ retainL ]
         
-        self.X_test = self.X_test[ self.retainL ]
+        self.X_test = self.X_test[ retainL ]
+        
+    def _ResetXY_T(self):
+        
+        self.X_train_T.reset_index(drop=True, inplace=True)
+        
+        self.X_test_T.reset_index(drop=True, inplace=True)
+        
+        self.y_train_t.reset_index(drop=True, inplace=True)
+        
+        self.y_test_t.reset_index(drop=True, inplace=True)
+
+    def _ResetTargetFeature(self):
+        ''' Resets target feature for looping
+        '''
+        self.y_train_t = self.Y_train[self.targetFeature]
+        
+        self.y_test_t = self.Y_test[self.targetFeature]
                 
+        # Copy the X data
+        self.X_train_T = deepcopy(self.X_train)
+        
+        self.X_test_T = deepcopy(self.X_test)
+
+        # Remove all samples where the targetfeature is NaN
+        self.X_train_T = self.X_train_T[~np.isnan(self.y_train_t)]
+        
+        self.y_train_t = self.y_train_t[~np.isnan(self.y_train_t)]
+        
+        self.X_test_T = self.X_test_T[~np.isnan(self.y_test_t)]
+        
+        self.y_test_t = self.y_test_t[~np.isnan(self.y_test_t)]
+               
+        self._ResetXY_T()
+        
+        self.X_columns_T = deepcopy(self.Xcolumns)
+        
+    def _PrepCovarSelection(self, nSelect):
+        '''
+        '''
+        
+        nfeatures = self.X_train_R.shape[1]
+
+        if nSelect >= nfeatures:
+
+            if self.verbose:
+
+                infostr = '            SKIPPING specific selection: Number of input features (%s) less than or equal to minimumm output covariates to select (%s).' %(nfeatures, nSelect)
+
+                print (infostr)
+
+            return (False, False)
+        
+        columns = [item for item in self.X_train_R.columns]
+
+        return (nfeatures, columns)   
+    
+    def _CleanUpCovarSelection(self, selector, selectorSymbolisation, retainL, discardL):
+        '''
+        '''
+        
+        self.specificFeatureSelectedD[self.targetFeature][self.regrModel[0]]['method'] = selector
+
+        self.specificFeatureSelectedD[self.targetFeature][self.regrModel[0]]['nFeaturesRemoved'] = len( discardL)
+
+        self.specificFeatureSelectionTxt = '- %s %s' %(len(discardL), selector)
+
+        if self.verbose:
+             
+            print ('\n            specificFeatureSelection:')
+
+            print ('                Regressor: %(m)s' %{'m':self.regrModel[0]})
+
+            print ('                ',self.specificFeatureSelectionTxt)
+
+            if self.verbose > 1:
+    
+                print ('                Selected features: %s' %(', '.join(retainL)))
+        
+        pngFPN = self.preProcessFPND['specificSelection'][self.targetFeature][self.regrModel[0]]
+
+        label = '%s Selection' %(selector)
+        
+        PlotCoviariateSelection(label, selectorSymbolisation,  
+                self.enhancementPlotLayout, pngFPN,
+                self.X_train_R, self.X_test_R, retainL, discardL, 
+                self.X_columns_R, self.paramD['targetFeatureSymbols'][self.targetFeature]['label'], self.regrModel[0])
+   
+        # reset the covariates
+        self.X_train_R = pd.DataFrame(self.X_train_R, columns=retainL)
+        
+        self.X_test_R = pd.DataFrame(self.X_test_R, columns=retainL)
+        
+        # Reset columns
+        valueL = []
+        
+        for item in retainL:
+            if item in self.columns:
+                
+                valueL.append(self.columns[item])
+                
+        self.X_columns_R = dict(zip(retainL,valueL))
+        
+    def _CleanUpSpecificeAgglomeration(self, selector, selectorSymbolisation, retainL, discardL):
+        '''
+        '''
+
+        self.specificClusteringdD[self.targetFeature]['nFeaturesRemoved'] = len( discardL)
+
+        self.specificClusteringTxt = '- %s %s' %(len(discardL), selector)
+        
+        #agglomeratetxt = '%s input features clustered to %s covariates using  %s' %(len(columns),len(self.aggColumnL),self.globalFeatureSelectedD['method'])
+
+        #self.agglomerateTxt = '%s clustered from %s to %s Feat´s' %(self.globalFeatureSelectedD['method'], len(columns),len(self.aggColumnL))
+        #FIXATEXT
+
+        if self.verbose:
+              
+            print ('\n            specificFeatureAgglomeration:')
+                
+            if self.verbose > 1:
+    
+                print ('                Selected features: %s' %(', '.join(retainL)))
+                        
+        pngFPN = self.preProcessFPND['specificClustering'][self.targetFeature]
+                
+        label = '%s Agglomeration' %(selector)
+
+        PlotCoviariateSelection(label, selectorSymbolisation,  
+                self.enhancementPlotLayout, pngFPN,
+                self.X_train_T, self.X_test_T, retainL, discardL, 
+                self.X_columns_T, self.paramD['targetFeatureSymbols'][self.targetFeature]['label'])
+   
+        # reset the covariates
+        self.X_train_T = pd.DataFrame(self.X_train_T, columns=retainL)
+        
+        self.X_test_T = pd.DataFrame(self.X_test_T, columns=retainL)
+        
+        # Reset columns
+        valueL = []
+        
+        for item in retainL:
+            if item in self.columns:
+                
+                valueL.append(self.columns[item])
+                
+        self.X_columns_T = dict(zip(retainL,valueL))
+                                     
     def _UnivariateSelector(self):
         '''
         '''
-        nfeatures = self.X_train.shape[1]
 
-        if self.generalFeatureSelection.univariateSelection.SelectKBest.apply:
-
-            n_features = self.generalFeatureSelection.univariateSelection.SelectKBest.n_features
-
-            if n_features >= nfeatures:
-
-                if self.verbose:
-
-                    infostr = '            SKIPPING SelectKBest: Number of features (%s) less than or equal to n_features (%s).' %(nfeatures,n_features)
-
-                    print (infostr)
-
-                return
-
-        else:
-
+        nfeatures, columns = self._PrepCovarSelection(self.specificFeatureSelection.univariateSelection.SelectKBest.n_features)
+        
+        if not nfeatures:
+            
             return
-
+        
         # Apply SelectKBest
-        select = SelectKBest(score_func=f_regression, k=n_features)
+        select = SelectKBest(score_func=f_regression, k=self.specificFeatureSelection.univariateSelection.SelectKBest.n_features)
         
         # Select and fit the independent variables, return the selected array
-        select.fit(self.X_train, self.y_train)
-        
-        X_train = select.transform(self.X_train)
-
-        X_test = select.transform(self.X_test)
+        select.fit(self.X_train_R, self.y_train_r)
 
         # Note that the returned select.get_feature_names_out() is not a list
-        columns = select.get_feature_names_out()
+        retainL = select.get_feature_names_out()
         
+        discardL = list( set(columns).symmetric_difference(retainL) )
+        
+        retainL.sort();  discardL.sort()
+                
         # Save the results in a dictionary
         scores = select.scores_
         
@@ -3662,91 +4758,41 @@ class RegressionModels:
         for c, covar in enumerate(covars):
             
             self.selectKBestResultD[covar] = {'score': scores[c], 'pvalue': pvalues[c]}
-            
-        # reset the covariates
-        self.X_train = pd.DataFrame(X_train, columns=columns)
-        
-        self.X_test = pd.DataFrame(X_test, columns=columns)
-
-        self.generalFeatureSelectedD['method'] ='SelectKBest'
-
-        self.generalFeatureSelectedD['nFeaturesRemoved'] = nfeatures-X_train.shape[1]
-
-        self.generalFeatureSelectionTxt = ' - %s %s' %( nfeatures-X_train.shape[1] ,'SelKBest')
-
-        if self.verbose:
-
-            print ('\n            specificFeatureSelection:')
-
-            print ('                ',self.generalFeatureSelectionTxt)
-
-        if self.verbose > 1:
-
-            print ('                Selected features: %s' %(', '.join( select.get_feature_names_out() ) ) )
-            
-            for covar in self.selectKBestResultD:
-                
-                print ('                    %s: score %s, pvalue %s' %(covar,  self.selectKBestResultD[covar]['score'], self.selectKBestResultD[covar]['pvalue']) )
-                  
+         
+        self._CleanUpCovarSelection('Univar SelKBest', self.enhancementPlotLayout.univariateSelection, retainL, discardL )
+                               
     def _PermutationSelector(self):
         '''
         '''
 
-        nfeatures = self.X_train_regressor.shape[1]
-
-        n_features_to_select = self.specificFeatureSelection.permutationSelector.n_features_to_select
-
-        if n_features_to_select >= nfeatures:
-
-            if self.verbose:
-
-                infostr = '            Permutation select: Number of features (%s) less than or equal to n_features_to_select (%s)' %(nfeatures,n_features_to_select)
-
-                print (infostr)
-
-            return
-
-        #Retrieve the model name and the model itself
-        name, model = self.regrModel
+        nfeatures, columns = self._PrepCovarSelection(self.specificFeatureSelection.permutationSelector.n_features_to_select)
         
-        columns = self.X_train_regressor.columns
-
+        if not nfeatures:
+            
+            return
+        
+        #Retrieve the model name and the model itself
+        model = self.regrModel[1]
+        
         #Fit the model
-        model.fit(self.X_train_regressor, self.y_train_regressor)
+        model.fit(self.X_train_R, self.y_train_r)
 
-        permImportance = permutation_importance(model, self.X_test_regressor, self.y_test_regressor)
+        permImportance = permutation_importance(model, self.X_test_R, self.y_test_r)
 
         permImportanceMean = permImportance.importances_mean
 
         sorted_idx = permImportanceMean.argsort()
 
-        columns = np.asarray(columns)[sorted_idx][::-1][0:n_features_to_select]
+        retainL = np.asarray(columns)[sorted_idx][::-1][0:self.specificFeatureSelection.permutationSelector.n_features_to_select].tolist()
         
-
-        self.X_train_regressor = pd.DataFrame(self.X_train_regressor, columns=columns)
+        r = set(retainL)
         
-        self.X_test_regressor = pd.DataFrame(self.X_test_regressor, columns=columns)
-
-        ####
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['method'] = 'PermutationSelector'
-
-        self.modelFeatureSelectedD[self.targetFeature][name]['nFeaturesRemoved'] = nfeatures - self.X_train_regressor.shape[1]
-
-        self.specificFeatureSelectionTxt = '- %s %s' %( nfeatures - self.X_train_regressor.shape[1], 'PermutSel')
-
-        if self.verbose:
-
-            print ('\n            modelFeatureSeelction:')
-
-            print ('                Regressor: %(m)s; Target feature: %(t)s' %{'m':name,'t':self.targetFeature})
-
-            print ('                ',self.specificFeatureSelectionTxt)
-
-        if self.verbose > 1:
-
-            print ('                Selected features: %s' %(', '.join(columns)))
-
+        discardL = [x for x in columns if x not in r]
+        
+        retainL.sort(); discardL.sort()
+        
+        self._CleanUpCovarSelection('Permut Select', self.enhancementPlotLayout.permutationSelector, retainL, discardL)
+        
     def _TreeBasedFeatureSelector(self):
         ''' NOTIMPLEMENTED
         '''
@@ -3759,321 +4805,149 @@ class RegressionModels:
         '''
         '''
 
-        nfeatures = self.X_train_regressor.shape[1]
-
-        n_features_to_select = self.specificFeatureSelection.RFE.n_features_to_select
-
-        if n_features_to_select >= nfeatures:
-
-            if self.verbose:
-
-                infostr = '            RFE: Number of features (%s) less than or equal to n_features_to_select (%s)' %(nfeatures,n_features_to_select)
-
-                print (infostr)
-
+        nfeatures, columns = self._PrepCovarSelection(self.specificFeatureSelection.RFE.n_features_to_select)
+        
+        if not nfeatures:
+            
             return
 
         step = self.specificFeatureSelection.RFE.step
-
-        columns = self.X_train_regressor.columns
 
         if self.verbose:
 
             if self.specificFeatureSelection.RFE.CV:
 
-                metod = 'RFECV'
-
                 print ('\n            RFECV feature selection')
 
             else:
 
-                metod = 'RFE'
-
                 print ('\n            RFE feature selection')
 
         #Retrieve the model name and the model itself
-        name,model = self.regrModel
+        model = self.regrModel[1]
 
         if self.specificFeatureSelection.RFE.CV:
 
-            select = RFECV(estimator=model, min_features_to_select=n_features_to_select, step=step)
-
+            select = RFECV(estimator=model, min_features_to_select=self.specificFeatureSelection.RFE.n_features_to_select, step=step, cv= self.specificFeatureSelection.RFE.CV)
+            
+            selector = 'RFECV'
+      
         else:
-
-            select = RFE(estimator=model, n_features_to_select=n_features_to_select, step=step)
-        
-        print (self.X_train_regressor)
-        
-        print (self.y_train_regressor)
-        
-        print (self.targetFeature)
-        
-        select.fit(self.X_train_regressor, self.y_train_regressor)
+            
+            selector = 'RFE'
+            
+            select = RFE(estimator=model, n_features_to_select=self.specificFeatureSelection.RFE.n_features_to_select, step=step)
+                
+        select.fit(self.X_train_R, self.y_train_r)
 
         selectedFeatures = select.get_support()
 
         #Create a list to hold discarded columns
-        selectL = []; discardL = []
+        retainL = []; discardL = []
 
-        #print the selected features and their variance
         for sf in range(len(selectedFeatures)):
             if selectedFeatures[sf]:
-                selectL.append(columns[sf])
+                retainL.append(columns[sf])
 
             else:
                 discardL.append(columns[sf])
+                
+        label = '%s Selection' %(selector)
+        
+        self._CleanUpCovarSelection(label, self.enhancementPlotLayout.RFE, retainL, discardL)       
+                                            
+    def _WardClustering(self, n_clusters):
+        '''
+        '''
 
-        self.modelFeatureSelectedD[self.targetFeature][name]['method'] = metod
+        nfeatures = self.X_train_T.shape[1]
 
-        self.modelFeatureSelectedD[self.targetFeature][name]['nFeaturesRemoved'] = len( discardL)
+        if nfeatures < n_clusters:
 
-        self.specificFeatureSelectionTxt = '- %s %s' %(len(discardL),'RFE')
+            n_clusters = nfeatures
+            
+            return
+        
+        ward = FeatureAgglomeration(n_clusters=n_clusters)
+
+        #fit the clusters
+        ward.fit(self.X_train_T, self.y_train_t)
+
+        self.clustering =  ward.labels_
+
+        # Get a list of bands
+        bandsL =  list(self.X_train_T)
+
+        self.aggColumnL = []
+
+        self.aggBandL = []
+        
+        discardL = []
+
+        for m in range(len(ward.labels_)):
+
+            indices = [bandsL[i] for i, x in enumerate(ward.labels_) if x == m]
+
+            if(len(indices) == 0):
+
+                break
+
+            self.aggColumnL.append(indices[0])
+
+            self.aggBandL.append( ', '.join(indices) )
+            
+            discardL.extend( indices[1:len(indices)])
+            
+        self.aggColumnL.sort()
+        
+        discardL.sort()
+            
+        self._CleanUpSpecificeAgglomeration('WardClustering', self.enhancementPlotLayout.wardClustering, self.aggColumnL, discardL )
+                                           
+    def _TuneWardClustering(self):
+        ''' Determines the optimal nr of cluster
+        '''
+        nfeatures = self.X_train_T.shape[1]
+
+        nClustersL = self.specificFeatureAgglomeration.wardClustering.tuneWardClustering.clusters
+
+        nClustersL = [c for c in nClustersL if c < nfeatures]
+
+        kfolds = self.specificFeatureAgglomeration.wardClustering.tuneWardClustering.kfolds
+
+        cv = KFold(kfolds)  # cross-validation generator for model selection
+
+        ridge = BayesianRidge()
+
+        cachedir = tempfile.mkdtemp()
+
+        mem = Memory(location=cachedir)
+
+        ward = FeatureAgglomeration(n_clusters=4, memory=mem)
+
+        clf = Pipeline([('ward', ward), ('ridge', ridge)])
+
+        # Select the optimal number of parcels with grid search
+        clf = GridSearchCV(clf, {'ward__n_clusters': nClustersL}, n_jobs=1, cv=cv)
+
+        clf.fit(self.X_train_T, self.y_train_t)  # set the best parameters
 
         if self.verbose:
 
-            print ('\n            modelFeatureSeelction:')
+            print ('            Report for tuning Ward Clustering')
 
-            print ('                Regressor: %(m)s; Target feature: %(t)s' %{'m':name,'t':self.targetFeature})
+        #report the top three results
+        self._ReportSearch(clf.cv_results_,3)
 
-            print ('                ',self.specificFeatureSelectionTxt)
+        #rerun with the best cluster agglomeration result
+        tunedClusters = clf.best_params_['ward__n_clusters']
 
-        if self.verbose > 1:
+        if self.verbose:
 
-            print ('                Selected features: %s' %(', '.join(selectL)))
-            
-        
-        self.X_train_regressor = pd.DataFrame(self.X_train_regressor, columns=selectL)
-        
-        self.X_test_regressor = pd.DataFrame(self.X_test_regressor, columns=selectL)
+            print ('                Tuned Ward clusters:', tunedClusters)
 
-        #self.modelSelectD[name] = selectL
-   
-    def _Standardisation(self):
-        """
-        """
-
-        scalertxt = 'None'
-        
-        columnsX = [item for item in self.X_train.columns]
-
-        # extract the covariate columns as X
-        X1 = self.X_train[columnsX]
-        
-        X2 = self.X_test[columnsX]
-        
-        scaler = StandardScaler().fit(X1)
-                
-        arrayLength = scaler.var_.shape[0]
-        
-        if self.spectraInfoEnhancement.standardisation.paretoscaling:
-            #  No meancentring, scales each variable by the square root of the standard deviation
-
-            # remove meancentring            
-            scaler.mean_ = np.zeros(arrayLength)
-                      
-            # set var_ to its own square root
-            scaler.var_ = np.sqrt(scaler.var_)
-            
-            # set scaling to the sqrt of the std
-            scaler.scale_ = np.sqrt(scaler.var_)
-                        
-            X1A = scaler.transform(X1)  
-            
-            X2A = scaler.transform(X2) 
-
-            scalertxt = 'Pareto'          
-                
-        elif self.spectraInfoEnhancement.standardisation.poissonscaling:
-            # No meancentring, scales each variable by the square root of the mean of the variable
-            
-            scaler = StandardScaler(with_mean=False).fit(X1)
-            
-            # Set var_ to mean_
-            scaler.var_ = scaler.mean_
-            
-            # set scaler to sqrt of mean_ (var_)
-            scaler.scale_ = np.sqrt(scaler.var_)
-            
-            X1A = scaler.transform(X1) 
-            
-            X2A = scaler.transform(X2) 
-            
-            scalertxt = 'Poisson' 
-            
-        elif self.spectraInfoEnhancement.standardisation.meancentring:
-            
-            if self.spectraInfoEnhancement.standardisation.unitscaling:
-                
-                # This is a classical autoscaling or z-score normalisation
-                X1A = StandardScaler().fit_transform(X1)
-                
-                X2A = StandardScaler().fit_transform(X2)
-                
-                scalertxt = 'Z-score' 
-                   
-            else:
-                
-                # This is meancentring
-                X1A = StandardScaler(with_std=False).fit_transform(X1)
-                
-                X2A = StandardScaler(with_std=False).fit_transform(X2)
-                
-                scalertxt = 'meancentring' 
-        
-        # Reset the train and test dataframes                
-        self.X_train = pd.DataFrame(data=X1A, columns=columnsX)
-        self.X_test = pd.DataFrame(data=X2A, columns=columnsX)
-        
-        print ('self.X_test',self.X_test)
-        
-        test = (X2 - scaler.mean_)/scaler.scale_
-        
-        X_test = pd.DataFrame(data=X2A, columns=columnsX)
-        
-        print ('X_test',X_test)
-                
-        return scalertxt, scaler.mean_, scaler.scale_
-        
-    def _PcaPreprocess(self):
-        """ See https://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/tutorial/astronomy/dimensionality_reduction.html
-            for faster (random) algorithm
-        """ 
-        
-        columns = [item for item in self.X_train]
-                
-        if (len(columns) < self.spectraInfoEnhancement.decompose.pca.n_components):
-            
-            exit('EXITING - the number of surviving bands are less than the PCA components requested')
-                
-        # set the covariate columns:
-        columns = []
-        
-        for i in range(self.spectraInfoEnhancement.decompose.pca.n_components):
-            if i > 100:
-                x = 'pc-%s' %(i)
-            elif i > 10:
-                x = 'pc-0%s' %(i)
-            else:
-                x = 'pc-00%s' %(i) 
-                
-            columns.append(x)
-        
-        pca = PCA(n_components=self.spectraInfoEnhancement.decompose.pca.n_components)
-
-        X_pc = pca.fit_transform(self.X_train)
-         
-        self.pcaComponents = pca.components_
-        
-        X_transformed = pca.fit_transform(self.X_train)
-
-        self.X_train = pd.DataFrame(data=X_transformed, columns=columns)
-        
-        X_transformed = pca.transform(self.X_test)
-        
-        self.X_test = pd.DataFrame(data=X_transformed, columns=columns)
-        
-        # The processing removes the existing sample numbers, thus also the y vectors must be reset
-        
-        self.ResetSeriesY()
-        
-    def ResetSeriesY(self):
-        
-        ytrain = np.array(self.y_train)
-                    
-        ytest = np.array(self.y_test)
-                            
-        self.y_train = pd.Series(ytrain)
-                    
-        self.y_test = pd.Series(ytest)
-                
-        if isinstance(self.y_test,pd.DataFrame):
-            
-            SNULLE
-
-    def _PlotOutliers(self, title):
-        '''
-        '''
-        #import matplotlib.pyplot as plt
-        #import numpy as np
-        from sklearn.datasets import load_iris
-        #from sklearn.inspection import DecisionBoundaryDisplay
-        from sklearn.tree import DecisionTreeClassifier
-        iris = load_iris()
-        
-        print ('Iris\n', iris)
-        SNULLE
-        feature_1, feature_2 = np.meshgrid(
-            np.linspace(iris.data[:, 0].min(), iris.data[:, 0].max()),
-            np.linspace(iris.data[:, 1].min(), iris.data[:, 1].max())
-        )
-        grid = np.vstack([feature_1.ravel(), feature_2.ravel()]).T
-        tree = DecisionTreeClassifier().fit(iris.data[:, :2], iris.target)
-        
-        y_pred = np.reshape(tree.predict(grid), feature_1.shape)
-        
-        display = DecisionBoundaryDisplay(
-            xx0=feature_1, xx1=feature_2, response=y_pred
-        )
-        
-        display.plot()
-        
-        display.ax_.scatter(
-            iris.data[:, 0], iris.data[:, 1], c=iris.target, edgecolor="black"
-        )
-        
-        plt.show()
-       
-        SNUCKL
-        n_samples, n_outliers = 120, 40
-        rng = np.random.RandomState(0)
-        covariance = np.array([[0.5, -0.1], [0.7, 0.4]])
-        cluster_1 = 0.4 * rng.randn(n_samples, 2) @ covariance + np.array([2, 2])  # general
-        cluster_2 = 0.3 * rng.randn(n_samples, 2) + np.array([-2, -2])  # spherical
-        
-        outliers = rng.uniform(low=-4, high=4, size=(n_outliers, 2))
-        
-        X = np.concatenate([cluster_1, cluster_2, outliers])
-        
-        y = np.concatenate(
-            [np.ones((2 * n_samples), dtype=int), -np.ones((n_outliers), dtype=int)]
-        )
-        
-        print ('X',X)
-        print ('y',y)
-       
-       
-        clf = IsolationForest(max_samples=100, random_state=0)
-        clf.fit(self.X_train)
-        
-        disp = DecisionBoundaryDisplay.from_estimator(
-            clf,
-            self.X_train,
-            response_method="predict",
-            alpha=0.5,
-        )
-        plt.show()
-        
-        SNULLE
-        
-        #Split the data into training and test subsets
-        #self.X_train, self.X_test, self.y_train, self.y_test = model_selection.train_test_split(self.Xall, self.y, test_size=self.modelling.modelTests.trainTest.testSize)
-
-        #X_train, X_test, y_train, y_test =  model_selection.train_test_split(X, y, stratify=y, random_state=42)
-
-        scatter = plt.scatter(self.Xall[:, 0], self.Xall[:, 1], c=self.y, s=20, edgecolor="k")
-        
-        handles, labels = scatter.legend_elements()
-        
-        plt.axis("square")
-        
-        #plt.legend(handles=handles, labels=["outliers", "inliers"], title="true class")
-        
-        plt.title("Gaussian inliers with \nuniformly distributed outliers")
-        
-        plt.show()
-        
-        SNULLE
-          
+        return (tunedClusters)
+    
     def _RemoveOutliers(self):
         """
         """
@@ -4096,20 +4970,22 @@ class RegressionModels:
 
                 extractTarget = True
                 
-            xyTrainDF = pd.DataFrame(self.X_train, columns=columnsX)
+            xyTrainDF = pd.DataFrame(self.X_train_T, columns=columnsX)
             
             xyTrainDF.reset_index()
             
-            xyTestDF = pd.DataFrame(self.X_test, columns=columnsX)
+            xyTestDF = pd.DataFrame(self.X_test_T, columns=columnsX)
             
             xyTestDF.reset_index()
             
             if extractTarget:
             
-                xyTrainDF['target'] = self.y_train
+                xyTrainDF['target'] = self.y_train_t
 
-                xyTestDF['target'] = self.y_test
+                xyTestDF['target'] = self.y_test_t
                 
+                columnsX.append('target')
+            
             return (xyTrainDF, xyTestDF)
                
         def RemoveOutliers(Xtrain, Xtest,  columnsX):
@@ -4125,7 +5001,6 @@ class RegressionModels:
     
                 outlierDetector = IsolationForest(contamination=self.removeOutliers.contamination)
                 
-    
             elif self.removeOutliers.detector.lower() in ['ee','eenvelope','ellipticenvelope']:
     
                 outlierDetector = EllipticEnvelope(contamination=self.removeOutliers.contamination)
@@ -4149,25 +5024,20 @@ class RegressionModels:
             
             yhat = outlierFit.predict(X)
     
-            # select all rows that are not outliers
+            # select all rows that are inliers           
+            XtrainInliers = Xtrain[ yhat==1 ]
             
-            #X['yhat'] = yhat
-
-            # Remove samples with outliers from the abundance array using the X array yhat columns
-            self.X_train = self.X_train[ yhat==1 ]
+            # select all rows that are outliers
+            XtrainOutliers = Xtrain[ yhat==-1 ]
             
-            self.y_train = self.y_train[ yhat==1 ]
+            # Remove samples with outliers from the X and y dataset
+            self.X_train_T = self.X_train_T[ yhat==1 ]
             
-            XtrainOutliers = self.X_train[ yhat==-1 ]
-            
-            XtestOutliers = self.X_train[ yhat==-1 ]
-            
-            
-            #Xtrain = Xtrain[X['yhat']==1 ]
-            
-            postTrainSamples = self.X_train.shape[0]
+            self.y_train_t = self.y_train_t[ yhat==1 ]
+                                    
+            postTrainSamples = self.X_train_T.shape[0]
                         
-            # And now the test data
+            # Run the test data with the same detector
             # extract the covariate columns as X
             X = Xtest[columnsX]
             
@@ -4175,17 +5045,15 @@ class RegressionModels:
             
             yhat = outlierFit.predict(X)
             
-            #X['yhat'] = yhat
+            XtestInliers = X[ yhat==1 ]
             
+            XtestOutliers = X[ yhat==-1 ]
             
+            self.X_test_T = self.X_test_T[ yhat==1 ]
             
-            self.y_test = self.y_test[ yhat==1 ]
-            
-            self.X_test = self.y_test[ yhat==1 ]
-            
-            #Xtest = Xtest[X['yhat']==1 ]
-            
-            postTestSamples = Xtest.shape[0]
+            self.y_test_t = self.y_test_t[ yhat==1 ]
+
+            postTestSamples = self.X_test_T.shape[0]
             
             self.nTrainOutliers = iniTrainSamples - postTrainSamples
             self.nTestOutliers = iniTestSamples - postTestSamples
@@ -4199,401 +5067,104 @@ class RegressionModels:
     
             if self.verbose:
     
-                print ('        ',outlierTxt)
+                print ('            ',outlierTxt)
              
             if len(columnsX) == 2:
-             
-                plotX =  Xtrain[columnsX[0]]
                 
-                plotY =  Xtrain[columnsX[1]]
-                 
-            print ('X',X)
-            
-            #X = X.drop("age", axis='columns')
-            X = X.drop(columns=['yhat'])
-         
-            #print (plotX)
-            #print (plotY)
-            print ('Xtrain')
-            print (Xtrain)
-            
-            SNULLE
-            '''
-            scatter = plt.scatter(plotX, plotY, s=20, edgecolor="k")
-            handles, labels = scatter.legend_elements()
-            plt.axis("square")
-            plt.legend(handles=handles, labels=["outliers", "inliers"], title="true class")
-            plt.title("Gaussian inliers with \nuniformly distributed outliers")
-            plt.show()
-            '''
-
-            fig, ax = plt.subplots()
-            colors = ["tab:blue", "tab:orange", "tab:red"]
-            # Learn a frontier for outlier detection with several classifiers
-            legend_lines = []
-            
-       
-            DecisionBoundaryDisplay.from_estimator(
-                outlierFit,
-                X,
-                response_method="decision_function",
-                plot_method="contour",
-                levels=[0],
-                ax=ax,
-            )
-            legend_lines.append(mlines.Line2D([], [], label=self.removeOutliers.detector.lower()))
-            
-            
-            ax.scatter(plotX, plotY, color="black", alpha=0.1)
-            ax.scatter(plotX, plotY, color="red", alpha=0.1)
-            
-            bbox_args = dict(boxstyle="round", fc="0.8")
-            arrow_args = dict(arrowstyle="->")
-            ax.annotate(
-                "outlying points",
-                xy=(4, 2),
-                xycoords="data",
-                textcoords="data",
-                xytext=(3, 1.25),
-                bbox=bbox_args,
-                arrowprops=arrow_args,
-            )
-            ax.legend(handles=legend_lines, loc="upper center")
-            _ = ax.set(
-                xlabel="ash",
-                ylabel="malic_acid",
-                title="Outlier detection on a real data set (wine recognition)",
-            )
-            plt.show()
-                    
-            SNULLE
-            ''' 
-            disp = DecisionBoundaryDisplay.from_estimator(
-            outlierFit,
-            X,
-            response_method="predict",
-            alpha=0.5,
-            )
-            disp.ax_.scatter(X[:, 0], X[:, 1], c=y, s=20, edgecolor="k")
-            handles, labels = scatter.legend_elements()
-            disp.ax_.set_title("Binary decision boundary \nof IsolationForest")
-            plt.axis("square")
-            plt.legend(handles=handles, labels=["outliers", "inliers"], title="true class")
-            plt.show()
-            ''' 
-            return (Xtrain, Xtest)
-                     
-        def FeatureListOLD(columnsX):
-            '''
-            '''
-            # extract the covariate columns as X
-            X = self.X_train[columnsX]
-    
-            iniTrainSamples = X.shape[0]
-    
-            if self.removeOutliers.detector.lower() in ['iforest','isolationforest']:
-    
-                outlierDetector = IsolationForest(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['ee','eenvelope','ellipticenvelope']:
-    
-                outlierDetector = EllipticEnvelope(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['lof','lofactor','localoutlierfactor']:
-    
-                outlierDetector = LocalOutlierFactor(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['1csvm','1c-svm','oneclasssvm']:
-    
-                outlierDetector = OneClassSVM(nu=self.removeOutliers.contamination)
-    
-            else:
-    
-                exit('unknown outlier detector')
-    
-            # The warning "X does not have valid feature names" is issued, but it is a bug and will go in next version
-            #yhat = outlierDetector.fit_predict(X)
-            
-            outlierFit = outlierDetector.fit(X)
-            
-            yhat = outlierFit.predict(X)
-    
-            # select all rows that are not outliers
-            
-            X['yhat'] = yhat
-
-            # Remove samples with outliers from the abudance array using the X array yhat columns
-            self.y_train = self.y_train[ yhat==1 ]
-            
-            self.X_train = self.X_train[X['yhat']==1 ]
-            
-            postTrainSamples = self.X_train.shape[0]
-                        
-            # And now the test data
-            # extract the covariate columns as X
-            X = self.X_test[columnsX]
-            
-            iniTestSamples = X.shape[0]
-            
-            yhat = outlierFit.predict(X)
-            
-            X['yhat'] = yhat
-            
-            self.y_test = self.y_test[ yhat==1 ]
-            
-            self.X_test = self.X_test[X['yhat']==1 ]
-            
-            postTestSamples = self.X_test.shape[0]
-            
-            self.nTrainOutliers = iniTrainSamples - postTrainSamples
-            self.nTestOutliers = iniTestSamples - postTestSamples
-    
-            self.outliersRemovedD['method'] = self.removeOutliers.detector
-            self.outliersRemovedD['nOutliersRemoved'] = self.nTrainOutliers+self.nTestOutliers
-    
-            self.outlierTxt = '%s (%s) outliers removed ' %(self.nTrainOutliers,self.nTestOutliers )
-    
-            outlierTxt = '%s (%s) outliers removed' %(self.nTrainOutliers,self.nTestOutliers)
-    
-            if self.verbose:
-    
-                print ('        ',outlierTxt)
-
-        def CovarTargetOLD(xyTrainDF, xyTestDF):
-            '''
-            '''
-            
-            columnsX = [item for item in xyTrainDF.columns]
-            
-            # extract the covariate columns as X
-            X = xyTrainDF[columnsX]
-    
-            iniTrainSamples = X.shape[0]
-    
-            if self.removeOutliers.detector.lower() in ['iforest','isolationforest']:
-    
-                outlierDetector = IsolationForest(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['ee','eenvelope','ellipticenvelope']:
-    
-                outlierDetector = EllipticEnvelope(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['lof','lofactor','localoutlierfactor']:
-    
-                outlierDetector = LocalOutlierFactor(contamination=self.removeOutliers.contamination)
-    
-            elif self.removeOutliers.detector.lower() in ['1csvm','1c-svm','oneclasssvm']:
-    
-                outlierDetector = OneClassSVM(nu=self.removeOutliers.contamination)
-    
-            else:
-    
-                exit('unknown outlier detector')
-    
-            # The warning "X does not have valid feature names" is issued, but it is a bug and will go in next version
-            #yhat = outlierDetector.fit_predict(X)
-    
-            outlierFit = outlierDetector.fit(X)
-            
-            yhat = outlierFit.predict(X)
-    
-            # select all rows that are not outliers
-            
-            X['yhat'] = yhat
-            
-            # Remove samples with outliers from the abudance array using the X array yhat columns
-            self.y_train = self.y_train[ yhat==1 ]
-            
-            self.X_train = self.X_train[X['yhat']==1 ]
-            
-            postTrainSamples = self.X_train.shape[0]
-                        
-            # And now the test data
-            #columnsX = [item for item in self.X_test.columns]
-            # extract the covariate columns as X
-            X = xyTestDF[columnsX]
-            
-            iniTestSamples = X.shape[0]
-            
-            yhat = outlierFit.predict(X)
-            
-            X['yhat'] = yhat
-            
-            self.y_test = self.y_test[ yhat==1 ]
-            
-            self.X_test = self.X_test[X['yhat']==1 ]
-            
-            postTestSamples = self.X_test.shape[0]
-
-            self.nTrainOutliers = iniTrainSamples - postTrainSamples
-            self.nTestOutliers = iniTestSamples - postTestSamples
-    
-            self.outliersRemovedD['method'] = self.removeOutliers.detector
-            self.outliersRemovedD['nOutliersRemoved'] = self.nTrainOutliers+self.nTestOutliers
-    
-            self.outlierTxt = '%s (%s) outliers removed ' %(self.nTrainOutliers,self.nTestOutliers )
-    
-            outlierTxt = '%s (%s) outliers removed' %(self.nTrainOutliers,self.nTestOutliers)
-    
-            if self.verbose:
-    
-                print ('        ',outlierTxt)
-            
-            
-            
+                # Use the orginal training data for defining the plot boundary between inliers and outliers
+                X = Xtrain[columnsX]
+                
+                PlotOutlierDetect(self.enhancementPlotLayout, self.preProcessFPND['outliers'][self.targetFeature],
+                                XtrainInliers, XtrainOutliers, XtestInliers, XtestOutliers,  
+                                postTrainSamples, self.nTrainOutliers, postTestSamples, self.nTestOutliers,
+                                self.removeOutliers.detector, columnsX, self.targetFeature, outlierFit, X)
+                      
         ''' Main def'''
-        if self.removeOutliers.mode == 'allcovars':
-        
-            columnsX = [item for item in self.X_train.columns]
-            
-            self.X_train, self.X_test = RemoveOutliers(self.X_train, self.X_test, columnsX)
-        
-        elif self.removeOutliers.mode == 'covarL' and len (self.removeOutliers.covarL) > 0:
-            
-            if "target" in self.removeOutliers.covarL:
                 
-                columns = [item for item in self.X_train.columns]
+        columns = [item for item in self.X_train_T.columns]
+            
+        if len(self.removeOutliers.covarList) == 0:
+            
+            return 
+          
+        if self.removeOutliers.covarList[0] == '*':
+        
+            columnsX = [item for item in self.X_train_T.columns]
+        
+        else:
+            
+            columnsX = self.removeOutliers.covarList
+            
+        if self.removeOutliers.includeTarget:
+            
+            columnsX.append('target')
+            
+        for item in columnsX:
                 
-                for item in self.removeOutliers.covarL:
+            if item != 'target' and item not in columns:
                     
-                    if item != 'target' and item not in columns:
-                        
-                        exitStr = 'EXITING - item %s missing in removeOutliers CovarL' %(item)
-                        
-                        exitStr += '\n    Available covars = %s' %(', '.join(columns) )
-                        
-                        exit(exitStr)
+                exitStr = 'EXITING - item %s missing in removeOutliers CovarL' %(item)
                 
-                xyTrainDF, xyTestDF = ExtractCovars(self.removeOutliers.covarL)
+                exitStr += '\n    Available covars = %s' %(', '.join(columns) )
                 
-                columnsX = [item for item in xyTrainDF.columns]
+                exit(exitStr)
+                            
+        xyTrainDF, xyTestDF = ExtractCovars(columnsX)
+                            
+        RemoveOutliers(xyTrainDF, xyTestDF, columnsX)
+        
+        self._ResetXY_T()
+
+    def _PcaPreprocess(self):
+        """ See https://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/tutorial/astronomy/dimensionality_reduction.html
+            for faster (random) algorithm
+        """ 
+        
+        Xcolumns = [item for item in self.X_train]
                 
-                self.X_train, self.X_test = RemoveOutliers(xyTrainDF, xyTestDF, columnsX)
+        if (len(Xcolumns) < self.spectraInfoEnhancement.decompose.pca.n_components):
+            
+            exit('EXITING - the number of surviving bands are less than the PCA components requested')
                 
+        # set the new covariate columns:
+        columnsStr = []
+        
+        columnsInt = []
+        
+        for i in range(self.spectraInfoEnhancement.decompose.pca.n_components):
+            if i > 100:
+                x = 'pc-%s' %(i)
+            elif i > 10:
+                x = 'pc-0%s' %(i)
             else:
+                x = 'pc-00%s' %(i) 
                 
-                self.X_train, self.X_test = RemoveOutliers(self.X_train, self.X_test, columnsX)
-                #FeatureList(self.removeOutliers.covarL)
-            
-        elif self.removeOutliers.mode.lower() == 'singlecovartarget' and len (self.removeOutliers.covarL) == 1:
+            columnsInt.append(i)
+            columnsStr.append(x)
         
-            xyTrainDF, xyTestDF = ExtractCovars(self.removeOutliers.covarL)
-            
-            CovarTarget(xyTrainDF, xyTestDF)
-            
-    
+        self.columns = dict(zip(columnsStr, columnsInt))
         
-            
-    def _WardClustering(self, n_clusters):
-        '''
-        '''
-
-        nfeatures = self.X_train.shape[1]
-
-        if nfeatures < n_clusters:
-
-            n_clusters = nfeatures
-            
-            return
+        pca = PCA(n_components=self.spectraInfoEnhancement.decompose.pca.n_components)
+                
+        X_pc = pca.fit_transform(self.X_train)
+         
+        self.pcaComponents = pca.components_
         
-        covardiff =  nfeatures-n_clusters
-
-        ward = FeatureAgglomeration(n_clusters=n_clusters)
-
-        #fit the clusters
-        ward.fit(self.X_train, self.y_train)
-
-        self.clustering =  ward.labels_
-
-        # Get a list of bands
-        bandsL =  list(self.X_train)
-
-        self.aggColumnL = []
-
-        self.aggBandL = []
-
-        for m in range(len(ward.labels_)):
-
-            indices = [bandsL[i] for i, x in enumerate(ward.labels_) if x == m]
-
-            if(len(indices) == 0):
-
-                break
-
-            self.aggColumnL.append(indices[0])
-
-            self.aggBandL.append( ', '.join(indices) )
-
-        self.generalFeatureSelectedD['method'] = 'WardClustering'
-
-        self.generalFeatureSelectedD['n_clusters'] = n_clusters
-
-        self.generalFeatureSelectedD['tuneWardClusteringApplied'] = self.generalFeatureSelection.featureAgglomeration.wardClustering.tuneWardClustering.apply
-
-        agglomeratetxt = '%s input features clustered to %s covariates using  %s' %(nfeatures,n_clusters,self.generalFeatureSelectedD['method'])
-
-        self.agglomerateTxt = '-%s WardCluster' %(covardiff)
-
-        if self.verbose:
-
-            print ('\n                ',agglomeratetxt)
-
-            if self.verbose > 1:
-
-                print ('                Clusters:')
-
-                for x in range(len(self.aggColumnL)):
-
-                    print ('                    ',self.aggBandL[x])
-
-        # reset the covariates
-        self.X_train = pd.DataFrame(self.X_train, columns=self.aggColumnL)
         
-        self.X_test = pd.DataFrame(self.X_test, columns=self.aggColumnL)
+        X_train_transformed = pca.fit_transform(self.X_train)
         
-    def _TuneWardClustering(self):
-        ''' Determines the optimal nr of cluster
-        '''
-        nfeatures = self.X_train.shape[1]
+        X_test_transformed = pca.transform(self.X_test)
+                
+        PlotPCA(self.enhancementPlotLayout, self.preProcessFPND['decomposition'], 'pca', self.Xcolumns,
+                                self.X_train, self.X_test, 
+                                pd.DataFrame(data=X_train_transformed, columns=columnsStr), 
+                                pd.DataFrame(data=X_test_transformed, columns=columnsStr))
 
-        nClustersL = self.generalFeatureSelection.featureAgglomeration.wardClustering.tuneWardClustering.clusters
-
-        nClustersL = [c for c in nClustersL if c < nfeatures]
-
-        kfolds = self.generalFeatureSelection.featureAgglomeration.wardClustering.tuneWardClustering.kfolds
-
-        cv = KFold(kfolds)  # cross-validation generator for model selection
-
-        ridge = BayesianRidge()
-
-        cachedir = tempfile.mkdtemp()
-
-        mem = Memory(location=cachedir)
-
-        ward = FeatureAgglomeration(n_clusters=4, memory=mem)
-
-        clf = Pipeline([('ward', ward), ('ridge', ridge)])
-
-        # Select the optimal number of parcels with grid search
-        clf = GridSearchCV(clf, {'ward__n_clusters': nClustersL}, n_jobs=1, cv=cv)
-
-        clf.fit(self.X_train, self.y_train)  # set the best parameters
-
-        if self.verbose:
-
-            print ('            Report for tuning Ward Clustering')
-
-        #report the top three results
-        self._ReportSearch(clf.cv_results_,3)
-
-        #rerun with the best cluster agglomeration result
-        tunedClusters = clf.best_params_['ward__n_clusters']
-
-        if self.verbose:
-
-            print ('                Tuned Ward clusters:', tunedClusters)
-
-        return (tunedClusters)
+        self.X_train = pd.DataFrame(data=X_train_transformed, columns=columnsStr)
+        
+        self.X_test = pd.DataFrame(data=X_test_transformed, columns=columnsStr)
+               
+        self.Xcolumns = dict(zip(columnsStr, columnsInt))
 
     def _RandomtuningParams(self,nFeatures):
         ''' Set hyper parameters for random tuning
@@ -4735,7 +5306,7 @@ class RegressionModels:
                                            n_iter=self.params.hyperParameterTuning.nIterSearch)
 
         
-        search.fit(self.X_train_regressor, self.y_train_regressor)
+        search.fit(self.X_train_R, self.y_train_r)
         
         resultD = self._ReportSearch(search.cv_results_,self.params.hyperParameterTuning.n_best_report)
 
@@ -4744,7 +5315,7 @@ class RegressionModels:
         # Set the hyperParameters to the best result
         for key in resultD[1]['hyperParameters']:
 
-            self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
+            self.paramD['modelling']['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
 
     def _ExhaustiveTuning(self):
         '''
@@ -4767,7 +5338,7 @@ class RegressionModels:
         search = GridSearchCV(mod, param_grid=self.paramGrid[name])
 
        
-        search.fit(self.X_train_regressor, self.y_train_regressor)
+        search.fit(self.X_train_R, self.y_train_r)
         
         resultD = self._ReportSearch(search.cv_results_,self.params.hyperParameterTuning.n_best_report)
 
@@ -4776,20 +5347,21 @@ class RegressionModels:
         # Set the hyperParameters to the best result
         for key in resultD[1]['hyperParameters']:
 
-            self.jsonparamsD['modelling']['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
+            self.paramD['modelling']['regressionModels'][name]['hyperParams'][key] = resultD[1]['hyperParameters'][key]
 
     def _ReportRegModelParams(self):
         '''
         '''
 
-        print ('            Model hyper-parameters:')
-
+        print ('\n            %s hyper-parameters: %s' % (self.regrModel[0], self.regrModel[1]))
+        '''
         for model in self.regressorModels:
 
             #Retrieve the model name and the model itself
             modelname,modelhyperparams = model
 
             print ('                name', modelname, modelhyperparams.get_params())
+        '''
 
     def _ReportSearch(self, results, n_top=3):
         '''
@@ -5025,9 +5597,7 @@ class MachineLearningModel(Obj, RegressionModels):
                         self.abundanceDf[column]
                         
                         print ( self.abundanceDf[column] )
-                        
-                        SNULLE
-                        
+                                              
                     except:
                         
                         print('cannot box-cox transform')
@@ -5117,14 +5687,20 @@ class MachineLearningModel(Obj, RegressionModels):
         self.outlierTxt = None
         self.generalFeatureSelectTxt = None; 
         self.specificFeatureSelectionTxt = None; 
-        #self.agglomerateTxt = None
+        self.agglomerateTxt = None
 
         # Use the wavelength as column headers
-        columns = self.jsonSpectraData['waveLength']
+        columnsInt = self.jsonSpectraData['waveLength']
 
         # Convert the column headers to strings
-        columns = [str(c) for c in columns]
-
+        columnsStr = [str(c) for c in columnsInt]
+        
+        # create a headerDict to have the columns as both strings (key) and floats/integers (values)
+        # Pandas DataFrame requires string, whereas pyplot requires numerical
+        self.columns = dict(zip(columnsStr,columnsInt))
+        
+        self.originalColumns = dict(zip(columnsStr,columnsInt))
+        
         n = 0
 
         # Loop over the spectra
@@ -5140,33 +5716,8 @@ class MachineLearningModel(Obj, RegressionModels):
 
             n += 1
 
-        self.spectraDF = pd.DataFrame(data=spectraA, columns=columns)
+        self.spectraDF = pd.DataFrame(data=spectraA, columns=columnsStr)
         
-        
-
-        '''
-        MOVE DERIVATIVES
-        if self.spectraInfoEnhancement.derivatives.apply:
-
-            spectraDerivativeDF,derivativeColumns = self._SpectraDerivativeFromDf(self.spectraDF, columns)
-
-            if self.spectraInfoEnhancement.derivatives.join:
-
-                frames = [self.spectraDF, spectraDerivativeDF]
-
-                self.spectraDF = pd.concat(frames, axis=1)
-
-                columns.extend(derivativeColumns)
-
-            else:
-
-                self.spectraDF = spectraDerivativeDF
-
-                columns = derivativeColumns
-        '''
-
-        self.originalColumns = columns
-
     def _SetSubPlots(self):
         '''
         '''
@@ -5469,25 +6020,23 @@ class MachineLearningModel(Obj, RegressionModels):
 
         self.paramJsonFPN = os.path.join(modelresultFP,paramJsonFN)
         
-        
-
-        
         self.imageFPND = {}; self.preProcessFPND = {}
         
-        self.preProcessFPND['scatterCorrection'] = {}; self.preProcessFPND['standardisation'] = {} 
-        self.preProcessFPND['derivatives'] = {}; self.preProcessFPND['decomposition'] = {}
-        self.preProcessFPND['outliers'] = {}
+        self.preProcessFPND['outliers'] = {}; 
+        self.preProcessFPND['specificClustering'] = {}
+        self.preProcessFPND['specificSelection'] = {}
         
-        # Image fiels unrelated to targets and regressors
-        
-        filterExtractFN = '%s_filterextract.png' %(prefix)
+        # Image files unrelated to targets and regressors 
+        filterExtractFN = '%sfilterextract.png' %(prefix)
         
         self.filterExtractPlotFPN = os.path.join(modelimageFP,filterExtractFN)
         
-        filterExtractFN = '%s_filterextract.png' %(prefix)
+        self.preProcessFPND['scatterCorrection'] = os.path.join(modelimageFP, '%s_scatter-correction.png' %(prefix) ) 
+        self.preProcessFPND['standardisation'] = os.path.join(modelimageFP, '%s_standardisation.png' %(prefix) ) 
+        self.preProcessFPND['derivatives'] = os.path.join(modelimageFP, '%s_derivatives.png' %(prefix) )
+        self.preProcessFPND['decomposition'] = os.path.join(modelimageFP, '%s_decomposition.png' %(prefix) )
+        self.preProcessFPND['varianceThreshold'] = os.path.join(modelimageFP, '%s_varaince-threshold-selector.png' %(prefix))
         
-        self.filterextractionPlotFPN = os.path.join(modelimageFP,filterExtractFN)
-
         # the picke files save the regressor models for later use
         self.trainTestPickleFPND = {}
 
@@ -5496,18 +6045,20 @@ class MachineLearningModel(Obj, RegressionModels):
         # loop over targetfeatures
         for targetFeature in self.paramD['targetFeatures']:
             
-            self.preProcessFPND['scatterCorrection'][targetFeature] = os.path.join(modelimageFP, '%s_%s_scatter-correction.png' %(prefix, targetFeature) ) 
-            self.preProcessFPND['standardisation'][targetFeature] = os.path.join(modelimageFP, '%s_%s_standardisation.png' %(prefix, targetFeature) ) 
-            self.preProcessFPND['derivatives'][targetFeature] = os.path.join(modelimageFP, '%s_%s_derivatives.png' %(prefix, targetFeature) )
-            self.preProcessFPND['decomposition'][targetFeature] = os.path.join(modelimageFP, '%s_%s_decomposition.png' %(prefix, targetFeature) )
-            self.preProcessFPND['outliers'][targetFeature] = os.path.join(modelimageFP, '%s_%s_scatter-outliers.png' %(prefix, targetFeature) )
-        
-
+            self.preProcessFPND['outliers'][targetFeature] = os.path.join(modelimageFP, '%s_%s_specific-outliers.png' %(prefix, targetFeature) )
+          
+            self.preProcessFPND['specificClustering'][targetFeature] = os.path.join(modelimageFP, '%s_%s_specfic-cluster.png' %(prefix, targetFeature) )
+            
+            self.preProcessFPND['specificSelection'][targetFeature] = {}
+            
             self.imageFPND[targetFeature] = {}
 
             self.trainTestPickleFPND[targetFeature] = {}; self.KfoldPickleFPND[targetFeature] = {}
 
             for regmodel in self.paramD['modelling']['regressionModels']:
+                                
+                self.preProcessFPND['specificSelection'][targetFeature][regmodel] = os.path.join(modelimageFP, '%s_%s_%s_specific-select.png' %(prefix, targetFeature, regmodel) )
+                
                 trainTestPickleFN = '%s%s_%s_%s_trainTest.xsp'    %(prefix,'modelid',targetFeature, regmodel)
 
                 KfoldPickleFN = '%s%s_%s_%s_Kfold.xsp'    %(prefix,'modelid',targetFeature, regmodel)
@@ -5603,7 +6154,7 @@ class MachineLearningModel(Obj, RegressionModels):
     
                     resultD['generalTweaks']['varianceThreshold'] = self.varianceThresholdD
     
-                if self.generalFeatureSelection.featureAgglomeration.apply:
+                if self.specificFeatureAgglomeration.apply:
     
                     resultD['generalTweaks']['featureAgglomeration'] = self.generalFeatureSelectedD
                 '''
@@ -5618,7 +6169,7 @@ class MachineLearningModel(Obj, RegressionModels):
 
         if self.specificFeatureSelection.apply:
 
-            resultD['modelFeatureSelection'] = self.modelFeatureSelectedD
+            resultD['modelFeatureSelection'] = self.specificFeatureSelectedD
 
         if self.modelling.featureImportance:
 
@@ -5677,8 +6228,10 @@ class MachineLearningModel(Obj, RegressionModels):
                     
                     self.multCompSummaryD[targetFeature]['results'] = self.regrJsonFPN
 
-        #pp = pprint.PrettyPrinter(indent=2)
-        #pp.pprint(resultD)
+        if self.verbose > 2:
+            
+            pp = pprint.PrettyPrinter(indent=2)
+            pp.pprint(resultD)
 
         jsonF = open(self.regrJsonFPN, "w")
         
@@ -5691,49 +6244,6 @@ class MachineLearningModel(Obj, RegressionModels):
         jsonF = open(self.summaryJsonFPN, "w")
 
         json.dump(summaryD, jsonF, indent = 2)
-
-    def _PlotTitleTextn(self, titleSuffix,plotskipstep):
-        ''' Set plot title and annotation
-
-            :param str titleSuffix: amendment to title
-
-            :returns: x-axis label
-            :rtype: str
-
-            :returns: y-axis label
-            :rtype: str
-
-            :returns: title
-            :rtype: str
-
-            :returns: text
-            :rtype: str
-        '''
-
-        # Set title
-        title = self.name
-
-        # set the text
-        text = self.modelPlot.text.text
-
-        # Add the bandwidth
-        if self.modelPlot.text.bandwidth:
-
-            bandwidth = (max(columns)- min(columns))/(len(columns)-1)
-
-            text += '\nbandwidth=%s nm' %( bandwidth )
-
-        # Add number of samples to text
-        if self.modelPlot.text.samples:
-
-            text += '\nnspectra=%s; nbands=%s' %( self.spectraDF.shape[0],len(columns))
-            text += '\nshowing every %s spectra' %( plotskipstep )
-
-        yLabel = self.modelPlot.rawaxislabel.x
-
-        xLabel = self.modelPlot.rawaxislabel.y
-
-        return (xLabel, yLabel, title, text)
 
     def _PilotModeling(self,rootFP,sourcedatafolder,dstRootFP, multCompFig, multCompAxs):
         ''' Steer the sequence of processes for modeling spectra data in json format
@@ -5752,6 +6262,9 @@ class MachineLearningModel(Obj, RegressionModels):
         
         # set the destination file names
         self._SetDstFPNs()
+        
+        # Creata a list for all images
+        self.figLibL = []
 
         # Get the band data as self.spectraDF
         self._GetBandData()
@@ -5791,7 +6304,9 @@ class MachineLearningModel(Obj, RegressionModels):
         self.trainTestResultD = {}; self.KfoldResultD  = {}; self.tunedHyperParamsD = {}
         self.generalFeatureSelectedD = {}; self.outliersRemovedD = {}; 
         self.targetFeatureSelectedD = {}
-        self.modelFeatureSelectedD = {}; self.modelFeatureImportanceD = {}
+        self.specificFeatureSelectedD = {} 
+        self.specificClusteringdD = {}
+        self.modelFeatureImportanceD = {}
         self.finalFeatureLD = {}
         self.trainTestSummaryD = {}; self.KfoldSummaryD  = {};
 
@@ -5799,18 +6314,19 @@ class MachineLearningModel(Obj, RegressionModels):
         for targetFeature in self.targetFeatures:
 
             self.tunedHyperParamsD[targetFeature] = {}; self.trainTestResultD[targetFeature] = {}
-            self.KfoldResultD[targetFeature] = {}; self.modelFeatureSelectedD[targetFeature] = {}
+            self.KfoldResultD[targetFeature] = {}; self.specificFeatureSelectedD[targetFeature] = {}
             self.targetFeatureSelectedD[targetFeature] = {}; self.modelFeatureImportanceD[targetFeature] = {}
             self.finalFeatureLD[targetFeature] = {}
             self.trainTestSummaryD[targetFeature] = {}; self.KfoldSummaryD[targetFeature]  = {};
+            self.specificClusteringdD[targetFeature] = {}
 
-            for regModel in self.jsonparamsD['modelling']['regressionModels']:
+            for regModel in self.paramD['modelling']['regressionModels']:
 
                 if self.paramD['modelling']['regressionModels'][regModel]['apply']:
 
                     self.trainTestResultD[targetFeature][regModel] = {}
                     self.KfoldResultD[targetFeature][regModel] = {}
-                    self.modelFeatureSelectedD[targetFeature][regModel] = {}
+                    self.specificFeatureSelectedD[targetFeature][regModel] = {}
                     self.modelFeatureImportanceD[targetFeature][regModel] = {}
                     self.finalFeatureLD[targetFeature][regModel] = {}
                     self.trainTestSummaryD[targetFeature][regModel] = {} 
@@ -5829,13 +6345,10 @@ class MachineLearningModel(Obj, RegressionModels):
 
                         self.tunedHyperParamsD[targetFeature][regModel] = {}
 
-        # Set the subplot
-        # MOVED
+
         self.spectraInfoEnhancement.scatterCorrectiontxt, self.scalertxt, self.spectraInfoEnhancement.decompose.pcatxt, self.hyperParamtxt = 'NA','NA','NA','NA'
         
         self._SetSubPlots()
-        
-        # HERE THE PROCESSING STARTS
         
         # Filtering is applied separately for each spectrum and does not affect the distribution
         # between train and test datasets
@@ -5847,108 +6360,98 @@ class MachineLearningModel(Obj, RegressionModels):
                 
             filtertxt = self._MultiFiltering()
             
+        # Extract a new pandas DF 
+        # The DF used in the loop must have all rows with NaN for the target feature removed        
+        self._ExtractDataFrameX()
+        
+        self._ResetDataFramesXY()
+        
+        # Scatter correction: except for Multiplicative Scatter Correction (MSC),
+        # the correction is strictly per spectrum and could be done prior to the split 
+        # MSC reguires a Meanspectra - that is returned from the function
+        self.spectraInfoEnhancement.scatterCorrectiontxt = 'scatter correction: None'
+                 
+        if self.spectraInfoEnhancement.apply:
+             
+            if self.spectraInfoEnhancement.scatterCorrection.apply:
+                
+                scatterCorrectiontxt, self.X_train, self.X_test, self.scattCcorrMeanSpectra = \
+                    ScatterCorrection(self.X_train, self.X_test, 
+                    self.spectraInfoEnhancement.scatterCorrection, self.enhancementPlotLayout,
+                    self.preProcessFPND['scatterCorrection'])
+                
+                self.spectraInfoEnhancement.scatterCorrectiontxt = 'scatter correction: %s' %(scatterCorrectiontxt)
+                
+            # standardisation can do meancentring, z-score normalisation, paretoscaling or poissionscaling
+            # the standardisation is defined from the training data and applied to the testdata
+            # 2 vectors are required for the standardisation; mean and variance (scaling) 
+            scaler = 'None'
+            
+            if self.spectraInfoEnhancement.standardisation.apply:
+                  
+                #scaler, scalerMean, ScalerScale = self._Standardisation()
+                self.X_train, self.X_test, scaler, scalerMean, ScalerScale = Standardisation(self.X_train, self.X_test,
+                                                self.spectraInfoEnhancement.standardisation, 
+                                                self.enhancementPlotLayout, 
+                                                self.preProcessFPND['standardisation'])
+                
+            if self.spectraInfoEnhancement.derivatives.apply:
+                
+                self.X_train, self.X_test, self.Xcolumns = Derivatives(self.X_train, 
+                                self.X_test, self.spectraInfoEnhancement.derivatives.join, 
+                                self.Xcolumns, self.enhancementPlotLayout, self.preProcessFPND['derivatives'])
+
+            if self.spectraInfoEnhancement.decompose.apply:
+                        
+                if self.spectraInfoEnhancement.decompose.pca.apply:
+                    
+                    # PCA preprocess    
+                    self.spectraInfoEnhancement.decompose.pcatxt = 'pca: None'
+                    
+                    self._PcaPreprocess()
+                    
+                    self.spectraInfoEnhancement.decompose.pcatxt = 'pca: %s comps' %(self.spectraInfoEnhancement.decompose.pca.n_components)
+         
+        # Any manual feature selection is applied to the original dataframe - i.e. affect all models the same
+        if self.manualFeatureSelection.apply:
+
+            self._ManualFeatureSelector()
+                       
+        if self.generalFeatureSelection.apply:
+
+            if self.generalFeatureSelection.varianceThreshold.apply:
+                
+                self._VarianceSelector()
+        
         # Loop over the target features to model
         for self.targetN, self.targetFeature in enumerate(self.targetFeatures):
 
             if self.verbose:
 
-                infoStr = '\n            Target feature: %s' %(self.targetFeature)
+                infoStr = '\n    Target feature: %s' %(self.targetFeature)
 
-                print (infoStr)
-
-            # Extract a new pandas DF 
-            # The DF used in the loop must have all rows with NaN for the target feature removed
-            self._ExtractDataFrame()
+            self._ResetTargetFeature()
+            # RemoveOutliers is applied per target feature
             
-            # Split the dataset between train and test
-            self._SplitDataSet()
-            
-            #self._PlotOutliers('title')
-            #SNULLE
-            
-            # Scatter correction: except for Multiplicative Scatter Correction (MSC),
-            # the correction is strictly per spectrum and could be done prior to the split 
-            # MSC reguires a Meanspectra - that is returned from the function
-            self.spectraInfoEnhancement.scatterCorrectiontxt = 'scatter correction: None'
-                     
-            if self.spectraInfoEnhancement.apply:
-                 
-                if self.spectraInfoEnhancement.scatterCorrection.apply:
-                    
-                    scatterCorrectiontxt, self.X_train, self.X_test, self.scattCcorrMeanSpectra = \
-                        SpectraScatterCorrectionFromDf(self.X_train, self.X_test, 
-                        self.spectraInfoEnhancement.scatterCorrection, self.enhancementPlotLayout,
-                        self.preProcessFPND['scatterCorrection'][self.targetFeature])
-                    
-                    self.spectraInfoEnhancement.scatterCorrectiontxt = 'scatter correction: %s' %(scatterCorrectiontxt)
-                    
-    
-                    # DataFrame is retructred in Scatter Corr and also y must be restructred   
-                    self.ResetSeriesY()
-                    
-                # standardisation can do meancentring, z-score normalisation, paretoscaling or poissionscaling
-                # the standardisation is defined from the training data and applied to the testdata
-                # 2 vectors are required for the standardisation; mean and variance (scaling) 
-                scaler = 'None'
-    
-                if self.spectraInfoEnhancement.standardisation.apply:
-                    
-                    #scaler, scalerMean, ScalerScale = self._Standardisation()
-                    scaler, scalerMean, ScalerScale = Standardisation(self.X_train, self.X_test,
-                                                    self.spectraInfoEnhancement.standardisation, 
-                                                    self.enhancementPlotLayout, 
-                                                    self.preProcessFPND['standardisation'][self.targetFeature])
-                                
-                # filtering can do moving average, weighted kernel, Savitzky-Golay or Gaussian filtering  
-                filtertxt = 'None'
-                                          
-                self.scalertxt = 'filter: %s' %(filtertxt)
-                                
-                # PCA preprocess    
-                self.spectraInfoEnhancement.decompose.pcatxt = 'pca: None'
-                        
-                if self.spectraInfoEnhancement.decompose.pca.apply:
-                    
-                    self._PcaPreprocess()
-                    
-                    self.spectraInfoEnhancement.decompose.pcatxt = 'pca: %s comps' %(self.spectraInfoEnhancement.decompose.pca.n_components)
-                        
-            # RemoveOutliers is applied to the full dataset and affects all models
             if self.removeOutliers.apply:
     
                 self._RemoveOutliers()
                 
-            # Any manual feature selection is applied to the original dataframe - i.e. affect all models the same
-            if self.manualFeatureSelection.apply:
-    
-                self._ManualFeatureSelector()
-    
-            # The feature selection is applied to the original dataframe - i.e. affect all models the same
-            if self.generalFeatureSelection.apply:
-    
-                if self.generalFeatureSelection.varianceThreshold.apply:
-                    
-                    self._VarianceSelector()
-                    
-                elif self.generalFeatureSelection.univariateSelection.apply:
+            # Covariate (X) Agglomeration
+            if self.specificFeatureAgglomeration.apply:
+
+                if self.specificFeatureAgglomeration.wardClustering.apply:
+                                            
+                    if self.specificFeatureAgglomeration.wardClustering.tuneWardClustering.apply:
                         
-                    self._UnivariateSelector()
+                        n_clusters = self._TuneWardClustering()
+
+                    else:
+
+                        n_clusters = self.specificFeatureAgglomeration.wardClustering.n_clusters
                     
-                # Covariate (X) Agglomeration
-                elif self.generalFeatureSelection.featureAgglomeration.apply:
-    
-                    if self.generalFeatureSelection.featureAgglomeration.wardClustering.apply:
-    
-                        if self.generalFeatureSelection.featureAgglomeration.wardClustering.tuneWardClustering.apply:
-    
-                            n_clusters = self._TuneWardClustering()
-    
-                        else:
-    
-                            n_clusters = self.generalFeatureSelection.featureAgglomeration.wardClustering.n_clusters
-    
-                        self._WardClustering(n_clusters)
-                        
+                    self._WardClustering(n_clusters)
+                
             self._SetTargetFeatureSymbol()
             
             #Loop over the defined models
@@ -5956,31 +6459,31 @@ class MachineLearningModel(Obj, RegressionModels):
                 
                 print ('        regressor:', self.regrModel[0])
                 
-                if hasattr(self,'X_train_regressor'):
-                    print ('before reset')
-                    print (self.X_train_regressor)
-                
                 #RESET COVARS
                 self._ResetRegressorXyDF()
                 
-                print ('after reset')
-                print (self.X_train_regressor)
-
+                
                 # Specific feature selection - max one applied in each model
                 if  self.specificFeatureSelection.apply:
-    
-                    if self.specificFeatureSelection.permutationSelector.apply:
+                            
+                    if self.specificFeatureSelection.univariateSelection.apply:
+                        
+                        if self.specificFeatureSelection.univariateSelection.SelectKBest.apply:
+                        
+                            self._UnivariateSelector()
+                                                  
+                    elif self.specificFeatureSelection.permutationSelector.apply:
     
                         self._PermutationSelector()
     
                     elif self.specificFeatureSelection.RFE.apply:
     
                         if self.regrModel[0] in ['KnnRegr','MLP', 'Cubist']:
-    
+                                
                             self._PermutationSelector()
     
                         else:
-    
+
                             self._RFESelector()
                                 
                     elif self.specificFeatureSelection.treeBasedSelector.apply:
@@ -6006,16 +6509,16 @@ class MachineLearningModel(Obj, RegressionModels):
                     # Set the regressor models to apply
                     self._RegModelSelectSet()
 
-                if self.verbose > 1:
+                if self.verbose > 2:
 
                     # Report the regressor model settings (hyper parameters)
                     self._ReportRegModelParams()
 
-                if isinstance(self.y_test_regressor,pd.DataFrame):
+                if isinstance(self.y_test_r,pd.DataFrame):
                      
                     exit ('obs is a dataframe, must be a dataseries')
 
-                columns = [item for item in self.X_train_regressor.columns]
+                columns = [item for item in self.X_train_R.columns]
                 
                 # unchanged columns from the start as lists
                 if type(columns) is list:
@@ -6025,7 +6528,7 @@ class MachineLearningModel(Obj, RegressionModels):
                 else: # otherwise not
 
                     self.finalFeatureLD[self.targetFeature][self.regrModel[0]] = columns.tolist()
-
+                                
                 if self.modelling.modelTests.apply:
 
                     if self.modelling.modelTests.trainTest.apply:
@@ -6182,8 +6685,7 @@ def SetupProcesses(iniParams):
           
                     paramD['spectraInfoEnhancement']['scatterCorrection']['duals'] = \
                         paramD['spectraInfoEnhancement']['scatterCorrection']['scaler']
-                           
-                           
+                                       
         # Add the targetFeatureSymbols
         paramD['targetFeatureSymbols'] = targetFeatureSymbolsD['targetFeatureSymbols']
         
@@ -6199,7 +6701,7 @@ def SetupProcesses(iniParams):
                 
         # Add the plot model layout
         paramD['modelPlot'] = modelPlotD['modelPlot']
-       
+
         paramD['multcompplot'] = False
         
         if multiProjectComparisonD['apply']:
@@ -6214,32 +6716,66 @@ def SetupProcesses(iniParams):
             paramD['targetFeatures'] = multiProjectComparisonD['targetFeatures']
             
             # Replace the applied regressors, but not the hyper parameter definitions    
-            for regressor in paramD['regressionModels']:
+            for regressor in paramD["modelling"]['regressionModels']:
                                
-                paramD['regressionModels'][regressor]['apply'] = multiProjectComparisonD['regressionModels'][regressor]['apply'] 
+                paramD["modelling"]['regressionModels'][regressor]['apply'] = multiProjectComparisonD["modelling"]['regressionModels'][regressor]['apply'] 
                 
-            # Replace all the processing steps boolean apply
-            '''processStepL = ['removeOutliers', 'manualFeatureSelection',
-                            'generalFeatureSelection','specificFeatureSelection',
-                            'modelFeatureSelection','featureAgglomeration',
-                            'hyperParameterTuning']'''
+            # Replace all the processing steps boolean apply            
+            processStepD = {}
             
-            processStepL = ['standardisation','removeOutliers', 
-                            'generalFeatureSelection','specificFeatureSelection',
-                            'modelFeatureSelection','featureAgglomeration',
-                            'hyperParameterTuning']
+            processStepD['spectraPreProcess'] = {}; processStepD['spectraInfoEnhancement'] = {}
+            processStepD['manualFeatureSelection'] = {}; processStepD['generalFeatureSelection'] = {};
+            processStepD['removeOutliers'] = {}; processStepD['specificFeatureAgglomeration'] = {};
+            processStepD['specificFeatureSelection'] = {}; 
             
-            for p in processStepL:
+            processStepD['spectraPreProcess'] = ['filtering','multifiltering']
+            processStepD['spectraInfoEnhancement'] = ['scatterCorrection','standardisation','derivatives','decompose']
+            processStepD['manualFeatureSelection'] = []
+   
+            processStepD['generalFeatureSelection'] = ['varianceThreshold']
+            processStepD['removeOutliers'] = []
+            processStepD['specificFeatureAgglomeration'] = ['wardClustering'] 
+            processStepD['specificFeatureSelection'] = ['univariateSelection','permutationSelector',
+                                                        'RFE']
+            
+            for pkey in processStepD:
+                                
+                paramD[pkey]['apply'] = multiProjectComparisonD[pkey]['apply']
                 
-                paramD[p]['apply'] = multiProjectComparisonD[p]['apply']
-                
+                for subp in processStepD[pkey]:
+                    
+                    paramD[pkey][subp]['apply'] = multiProjectComparisonD[pkey][subp]['apply']
+            
             # Replace the feature importance reporting
-            paramD['featureImportance'] = multiProjectComparisonD['featureImportance']
+            paramD['modelling']['featureImportance'] = multiProjectComparisonD['modelling']['featureImportance']
             
              
             # Replace the model test
-            paramD['modelTests'] = multiProjectComparisonD['modelTests']                          
+            paramD['modelling']['modelTests'] = multiProjectComparisonD['modelling']['modelTests']                          
             
+        # Setting of single and/or dual scatter correction
+        if paramD['spectraInfoEnhancement']['apply']:
+        
+            if paramD['spectraInfoEnhancement']['scatterCorrection']['apply']:
+                           
+                if len(paramD['spectraInfoEnhancement']['scatterCorrection']['scaler']) == 0:
+                
+                    paramD['spectraInfoEnhancement']['scatterCorrection']['apply'] = False
+            
+                elif len(paramD['spectraInfoEnhancement']['scatterCorrection']['scaler']) == 1:
+                    
+                    paramD['spectraInfoEnhancement']['scatterCorrection']['singles'] = \
+                        paramD['spectraInfoEnhancement']['scatterCorrection']['scaler']
+                        
+                    paramD['spectraInfoEnhancement']['scatterCorrection']['duals'] = []
+                    
+                else:
+                    
+                    paramD['spectraInfoEnhancement']['scatterCorrection']['singles'] = []
+          
+                    paramD['spectraInfoEnhancement']['scatterCorrection']['duals'] = \
+                        paramD['spectraInfoEnhancement']['scatterCorrection']['scaler']
+                        
         # Get the target feature transform
         targetFeatureTransformD = ReadAnyJson(paramD['input']['targetfeaturetransforms'])
     
@@ -6248,11 +6784,6 @@ def SetupProcesses(iniParams):
         
         # Invoke the modeling
         mlModel = MachineLearningModel(paramD)
-        
-        mlModel.paramD = paramD
-
-        # Add the raw paramD as a variable to mlModel
-        mlModel.jsonparamsD = paramD
 
         # Set the regressor models to apply
         mlModel._RegModelSelectSet()
@@ -6306,7 +6837,7 @@ def SetupProcesses(iniParams):
 if __name__ == '__main__':
     ''' If script is run as stand alone
     '''
-    OutliersTest()
+    #OutliersTest()
 
     '''
     if len(sys.argv) != 2:
