@@ -2137,7 +2137,10 @@ def SetMultCompPlots(multiProjectComparisonD, targetFeatureSymbolsD, figCols):
                 indextitle = '%s' %( index.replace('Importance', ' Importance'))
                 
                 suptitle = "Covariate evaluation: %s; Target: %s (rows=regressors)\n" %(indextitle, label)
-
+            
+            print (suptitle)
+            #SNULLE
+                
             '''
             if self.varianceSelectTxt != None:
     
@@ -3265,6 +3268,9 @@ class RegressionModels:
         self.y_test_r =  deepcopy(self.y_test_t)
         
         self.X_columns_R = deepcopy(self.X_columns_T)
+        
+        # Reomve all NoN and infinity
+        self._ResetXY_R()
                        
     
             
@@ -4066,76 +4072,69 @@ class RegressionModels:
 
             text += '\n%s' %(self.specificFeatureSelectionTxt)
             
-        if 1 == 1:
-            #print (self.targetFeature,index)
-            #print (multCompAxs[self.targetFeature][index])
-            #print (self.regressionModelPlotColumnD)
-            #print (self.modelNr)
-            #print ( self.multCompPlotsColumns[index] )
-            #columnNr = getattr(self.multCompPlotsColumns, index)
-            columnNr = self.modelNr
-               
-            if (len(self.regressorModels)) == 1: # only state the column
-                
-                multCompAxs[self.targetFeature][index][columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
-
-                multCompAxs[self.targetFeature][index][columnNr].tick_params(labelleft=False)
-
-                multCompAxs[self.targetFeature][index][columnNr].text(.3, .95, text, ha='left', va='top',
-                                            transform=multCompAxs[self.targetFeature][index][columnNr].transAxes)
-
-                #multCompAxs[self.targetFeature][index][columnNr].set_ylabel(yLabel)
-                
-                if hasattr(self, 'featureImportancePlot') and hasattr(self.featureImportancePlot, 'xticks'):
+        columnNr = self.modelNr
+           
+        if (len(self.regressorModels)) == 1: # only state the column
             
-                    argD = self._PyplotArgs(self.featureImportancePlot.xticks,{"axis":"x"} )
-                                
-                    multCompAxs[self.targetFeature][index][columnNr].tick_params(**argD)
-                    
-                multCompAxs[self.targetFeature][index][columnNr].set_ylim(ymin=0)
+            multCompAxs[self.targetFeature][index][columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
 
+            multCompAxs[self.targetFeature][index][columnNr].tick_params(labelleft=False)
+
+            multCompAxs[self.targetFeature][index][columnNr].text(.3, .95, text, ha='left', va='top',
+                                        transform=multCompAxs[self.targetFeature][index][columnNr].transAxes)
+
+            #multCompAxs[self.targetFeature][index][columnNr].set_ylabel(yLabel)
+            
+            if hasattr(self, 'featureImportancePlot') and hasattr(self.featureImportancePlot, 'xticks'):
+        
+                argD = self._PyplotArgs(self.featureImportancePlot.xticks,{"axis":"x"} )
+                            
+                multCompAxs[self.targetFeature][index][columnNr].tick_params(**argD)
+                
+            multCompAxs[self.targetFeature][index][columnNr].set_ylim(ymin=0)
+
+
+        else:
+                            
+            multCompAxs[self.targetFeature][index][self.regrN, columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
+
+            multCompAxs[self.targetFeature][index][self.regrN, columnNr].tick_params(labelleft=False)
+
+            multCompAxs[self.targetFeature][index][self.regrN, columnNr].text(.3, .95, text, ha='left', va='top',
+                                            transform=multCompAxs[self.targetFeature][index][self.regrN, columnNr].transAxes)
+
+            #multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(yLabel)
+
+            if hasattr(self, 'featureImportancePlot') and hasattr(self.featureImportancePlot, 'xticks'):
+        
+                argD = self._PyplotArgs(self.featureImportancePlot.xticks,{"axis":"x"} )
+                            
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].tick_params(**argD)
+            
+            multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylim(ymin=0)
+            
+        if index == 'coefficientImportance':
+
+            if (len(self.regressorModels)) == 1:
+
+                # Draw horisontal line ay y=y
+                multCompAxs[self.targetFeature][index][columnNr].axhline(y=0, lw=1, c='black')
 
             else:
-                                
-                multCompAxs[self.targetFeature][index][self.regrN, columnNr].bar(featureArray, importanceArray, yerr=errorArray, color=self.featureSymbolColor)
 
-                multCompAxs[self.targetFeature][index][self.regrN, columnNr].tick_params(labelleft=False)
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].axhline(y=0, lw=1, c='black')
 
-                multCompAxs[self.targetFeature][index][self.regrN, columnNr].text(.3, .95, text, ha='left', va='top',
-                                                transform=multCompAxs[self.targetFeature][index][self.regrN, columnNr].transAxes)
+        # if at last row
+        if self.regrN == self.nRegrModels-1:
 
-                #multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylabel(yLabel)
+            if (len(self.regressorModels)) == 1:
 
-                if hasattr(self, 'featureImportancePlot') and hasattr(self.featureImportancePlot, 'xticks'):
-            
-                    argD = self._PyplotArgs(self.featureImportancePlot.xticks,{"axis":"x"} )
-                                
-                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].tick_params(**argD)
+                multCompAxs[self.targetFeature][index][columnNr].set_xlabel('Features')
+
+            else:
+
+                multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_xlabel('Features')
                 
-                multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_ylim(ymin=0)
-                
-            if index == 'coefficientImportance':
-
-                if (len(self.regressorModels)) == 1:
-
-                    # Draw horisontal line ay y=y
-                    multCompAxs[self.targetFeature][index][columnNr].axhline(y=0, lw=1, c='black')
-
-                else:
-
-                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].axhline(y=0, lw=1, c='black')
-
-            # if at last row
-            if self.regrN == self.nRegrModels-1:
-
-                if (len(self.regressorModels)) == 1:
-
-                    multCompAxs[self.targetFeature][index][columnNr].set_xlabel('Features')
-
-                else:
-
-                    multCompAxs[self.targetFeature][index][self.regrN, columnNr].set_xlabel('Features')
-                    
         # if at first column
         if columnNr == 0:
 
@@ -4586,6 +4585,35 @@ class RegressionModels:
         self.y_train_t.reset_index(drop=True, inplace=True)
         
         self.y_test_t.reset_index(drop=True, inplace=True)
+        
+        # Remove all non-finite values       
+        self.X_train_T = self.X_train_T[np.isfinite(self.y_train_t)] 
+        
+        self.y_train_t = self.y_train_t[np.isfinite(self.y_train_t)] 
+        
+        self.X_test_T = self.X_test_T[np.isfinite(self.y_test_t)] 
+
+        self.y_test_t = self.y_test_t[np.isfinite(self.y_test_t)] 
+        
+    def _ResetXY_R(self):
+        
+        self.X_train_R.reset_index(drop=True, inplace=True)
+        
+        self.X_test_R.reset_index(drop=True, inplace=True)
+        
+        self.y_train_r.reset_index(drop=True, inplace=True)
+        
+        self.y_test_r.reset_index(drop=True, inplace=True)
+        
+        # Remove all non-finite values       
+        self.X_train_R = self.X_train_R[np.isfinite(self.y_train_r)] 
+        
+        self.y_train_r = self.y_train_r[np.isfinite(self.y_train_r)] 
+        
+        self.X_test_R = self.X_test_R[np.isfinite(self.y_test_r)] 
+
+        self.y_test_r = self.y_test_r[np.isfinite(self.y_test_r)]
+        
 
     def _ResetTargetFeature(self):
         ''' Resets target feature for looping
@@ -4668,6 +4696,8 @@ class RegressionModels:
         
         self.X_test_R = pd.DataFrame(self.X_test_R, columns=retainL)
         
+        self._ResetXY_R()
+        
         # Reset columns
         valueL = []
         
@@ -4737,7 +4767,16 @@ class RegressionModels:
         select = SelectKBest(score_func=f_regression, k=self.specificFeatureSelection.univariateSelection.SelectKBest.n_features)
         
         # Select and fit the independent variables, return the selected array
+        print ('xmax',self.X_train_R.max())
+        print ('ymax',self.y_train_r.max())
+        
+        print ('xmin',self.X_train_R.min())
+        print ('ymin',self.y_train_r.min())
+        
+
         select.fit(self.X_train_R, self.y_train_r)
+        
+        
 
         # Note that the returned select.get_feature_names_out() is not a list
         retainL = select.get_feature_names_out()
